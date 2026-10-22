@@ -3,6 +3,7 @@ export * from "./features/mdeoMetamodelResolver.js";
 export * from "./features/defaultMdeoMetamodelResolver.js";
 export * from "./features/mdeoScopeProvider.js";
 export * from "./features/mdeoSerializers.js";
+export * from "./features/operatorArguments.js";
 export * from "./grammar/mdeoRules.js";
 export * from "./grammar/mdeoTypes.js";
 export * from "./plugin/mdeoContributionPlugin.js";
