@@ -1,7 +1,8 @@
 # Model Transformation plugin
 
 Rewrites models. A transformation matches a fragment of a model and changes it; during an
-optimisation, transformations are the mutation operators — the only moves the search may make.
+optimisation, transformations are the mutation and crossover operators — the only moves the search
+may make.
 
 ## At a glance
 
@@ -119,10 +120,11 @@ a conjunction, and a block that holds nothing but a clause is a plain guard on t
 
 ::: tip Moving elements between blocks
 In the graphical editor, an element created in *forbid* or *require* mode starts in a block of its
-own. Use **Move to Block** in the context rail to move it — together with everything connected to it
-— into another block, into a new one, or back into the match pattern. Where clauses move the same
-way, unless they read an object of their block: such a clause means nothing outside it, so the move
-is not offered. **Add Where Clause** on a member of a block adds a clause to that block.
+own. The **Change Modifier** menu in the context rail lists the *Forbid* and *Require* blocks of the
+pattern: choose one to move the element — together with everything connected to it — into another
+block or into a new one, and *None*, *Create* or *Delete* to move it back into the match pattern.
+Where clauses move the same way, unless they read an object of their block: such a clause means
+nothing outside it, so the move is not offered. **Add Where Clause** on a member of a block adds a clause to that block.
 :::
 
 Inside an object's braces, `=` assigns a property while `==`, `!=`, `<`, `>`, `<=` and `>=` constrain
@@ -190,22 +192,35 @@ may appear in one expression (`a.exists((x) => x == o) && !b.exists((y) => y == 
 
 #### Callable transformations
 
-A transformation can call another one, in the style of the method calls of story diagrams: the
-callee declares a **signature** with typed `in` and `out` parameters, and the caller **imports** it
-and runs it with `call`.
+Every `.mt` file is a transformation that other transformations can call, in the style of the method
+calls of story diagrams: the callee declares typed **inputs** and **outputs** in its header, and the
+caller **imports** the file under a name of its own and runs it with `call`.
 
 <<< @/../samples/callable-transformations/generic/move-component.mt{mt}
 
-The signature follows the `using` line and the imports. A parameter is a **model element** — its
-type is a class of the metamodel —, a **scalar** — `int`, `long`, `float`, `double`, `string`,
-`boolean` or an enum of the metamodel — or a **collection** of either, `List<T>` or `Set<T>`.
+**The header.** A file starts with its `using` line, then its imports, then its declarations, one
+per line, and only then its statements:
 
-| Parameter | When the callee starts | Use in the callee |
+| Line | Meaning |
+| --- | --- |
+| `import "./path/file.mt" as name` | Make another transformation callable as `call name(…)` |
+| `in name: Type` / `in name: Type = default` | An input |
+| `out name: Type` | An output |
+
+Declarations belong to the header: a declaration after the first statement does not parse. A file
+without declarations is callable too, with no arguments. An input is a **model element** — its type
+is a class of the metamodel —, a **scalar** — `int`, `long`, `float`, `double`, `string`, `boolean`
+or an enum of the metamodel —, a **collection** of either, `List<T>` or `Set<T>`, or another
+**model**, `model` or `List<model>` (see [Model inputs](#model-inputs)). An output is an element, a
+scalar or a collection.
+
+| Declaration | When the callee starts | Use in the callee |
 | --- | --- | --- |
 | `in name: Class` | bound to the element the caller passed | a bound node of every pattern: `name { … }`, `name.end -- other`, `delete name`, and in expressions |
 | `in name: Class?` | bound to the passed element; when none (or null) is passed, the object `name` of the first pattern is matched freely | the object of the same name in the first pattern — see [Optional element inputs](#optional-element-inputs) |
 | `in name: int = 0` | bound to the argument, or to the default when the caller passes none | a value in expressions |
 | `in name: List<Class>` / `Set<int>` | the collection the caller passed | in expressions (`name.size()`, `name.exists(…)`) and in `for x in name do { … }` |
+| `in name: model` / `List<model>` | the model, or the models, the caller passed | the target of scope blocks `in name { … }` — see [Model inputs](#model-inputs) |
 | `out name: Class` / `out name: int` | `null` | assigned with `name = expression`, in a pattern or as a statement |
 | `out name: List<Class>` / `Set<string>` | empty | grown with `name += expression`, in a pattern or as a statement |
 
@@ -213,9 +228,11 @@ A callee whose element inputs are already bound repairs locally around them:
 
 <<< @/../samples/callable-transformations/sync/follow-reader.mt{mt}
 
-The caller imports the callee and names the arguments; after `->` it binds the outputs it needs to
-names of its own. They are bound exactly as if a `match` had bound them: an element output is an
-object that later patterns reference as `m { }`, a scalar or collection output is a value.
+The caller imports the callee by its path and gives it a name with `as`; that alias is the only name
+of the callee in the file, and `call` uses it. The arguments are named after the callee's inputs;
+after `->` the caller binds the outputs it needs to names of its own. They are bound exactly as if a
+`match` had bound them: an element output is an object that later patterns reference as `m { }`, a
+scalar or collection output is a value.
 
 <<< @/../samples/callable-transformations/move-with-stores.mt{mt}
 
@@ -244,11 +261,12 @@ adds its value. Collections are values: they cannot be nodes of a pattern, and a
 changes the collections it was passed.
 
 **Loops over collections.** `for x in collection do { … }` runs its block once per element. The
-collection — a collection parameter or output, a many-valued reference such as
+collection — a collection input or output, a many-valued reference such as
 `placement.candidates`, or any collection expression — is evaluated once, before the first run. In
 the block, `x` is a bound object when the elements are model elements (`x { … }` in the block's
-patterns, `call repair(component = x)`) and a value otherwise, and it is visible in the block only,
-like the objects of a `for match`. An empty collection runs the block not at all, which is a success.
+patterns, `call repair(component = x)`), a model when the collection is a `List<model>` input, and
+a value otherwise. It is visible in the block only, like the objects of a `for match`. An empty
+collection runs the block not at all, which is a success.
 
 **Assignments outside patterns.** `name = expression` assigns a variable of an enclosing scope or an
 output, and `name += expression` adds to a collection output, as statements of their own — in a
@@ -297,49 +315,139 @@ may declare an object of its name — reference it as `name { }`.
 metamodel imports (directly or not). A transformation written for a base metamodel — here
 `architecture.mm` — therefore runs inside a transformation of an extending metamodel —
 `microservices.mm` — and its patterns also match the subclasses that metamodel adds. The reverse is
-rejected.
+rejected. Model arguments follow the same rule: a callee written for the base metamodel reads models
+of the extending one.
 
 **Checks in the editor.** The validator reports, on the line concerned:
 
-- arguments that name no parameter of the callee, an output passed as an argument or an input bound
+- imports of files that do not exist or are not transformations, aliases that collide with another
+  alias or another name of the file, and — as a warning — a file imported twice;
+- arguments that name no input of the callee, an output passed as an argument or an input bound
   as an output, and arguments or outputs given twice;
-- missing required inputs (an `in` parameter without default whose type is not nullable);
-- argument types that are not assignable to the parameter's type (a subclass of an element
-  parameter's class is fine, and so is a collection of a subclass);
-- imports of files that do not exist, that have no signature or whose signature has another name;
+- missing required inputs (an `in` declaration without default whose type is not nullable, and every
+  model input);
+- argument types that are not assignable to the input's type (a subclass of an element input's
+  class is fine, and so is a collection of a subclass);
 - callees of an incompatible metamodel;
 - import cycles: recursive calls are not supported;
-- outputs that are not assigned on every successful path (at the end and at every `stop`);
-- assignments to `in` parameters, `+=` on anything but a collection output, values of the wrong
-  type for `=` and `+=`, and parameters, outputs or loop variables used as pattern nodes although
+- defaults on outputs, and outputs that are not assigned on every successful path (at the end and at
+  every `stop`);
+- assignments to inputs, `+=` on anything but a collection output, values of the wrong
+  type for `=` and `+=`, and inputs, outputs or loop variables used as pattern nodes although
   they are scalars, collections, unbound outputs or nullable;
 - loops over expressions that are not collections;
 - `if call` of a transformation that may fail after it changed the model;
-- nullable element inputs that pin no object of the first pattern, or one of another class.
+- nullable element inputs that pin no object of the first pattern, or one of another class;
+- every rule of [model inputs](#model-inputs).
 
-Parameter, output and loop-variable names take part in the file-wide uniqueness of names (an
+Input, output, alias and loop-variable names take part in the file-wide uniqueness of names (an
 optional element input shares its name with the object it pins). Hover over a call, an import, an
-argument or an output shows the callee's signature or the parameter; *Go to definition* jumps into
-the callee. Completion offers the callee's inputs inside the parentheses and its outputs after `->`.
+argument or an output shows the callee's `in` and `out` declarations or the declaration concerned;
+*Go to definition* on an alias or a call opens the callee. Completion offers the callee's inputs
+inside the parentheses and its outputs after `->`.
 
-**As mutation operators.** A transformation listed in a [`search` block](/plugins/config-mdeo#the-search-section)
-must not have required inputs: the optimizer passes no arguments, so inputs take their defaults,
-optional inputs are null — optional element inputs leave their objects free — and outputs are
-ignored. List the wrapper (`move-with-stores.mt`), not its callees: the wrapper is one operator in
-the random choice of operators, so the move and its repair always happen together.
+**As operators.** A transformation listed in the [`search` section](/plugins/config-mdeo#the-search-section)
+is called by the optimizer. A **mutation operator** must not have model inputs, and every required
+input must be passed by the configuration in a [`with { }` block](/plugins/config-mdeo#operator-arguments);
+inputs it does not pass take their defaults, optional inputs are null — optional element inputs
+leave their objects free — and outputs are ignored. A **crossover operator** has model inputs; see
+[Model inputs](#model-inputs). List the wrapper (`move-with-stores.mt`), not its callees: the wrapper
+is one operator in the random choice of operators, so the move and its repair always happen
+together.
 
 A file with required inputs cannot be run on its own with the **Run** action either; it only runs
-when another transformation calls it.
+when another transformation, or the optimizer, calls it.
+
+#### Model inputs
+
+A transformation always runs on one model, the **transformed model**: the model it is applied to,
+the only one it changes. It may in addition read other models of its metamodel, declared as **model
+inputs**. This is what a [crossover operator](/plugins/config-mdeo#crossover-operators) is: during an
+optimisation it runs on a copy of one parent, which becomes the child, and reads the other parents —
+the *donors* — through its model inputs.
+
+<<< @/../samples/crossover/take-tier.mt{mt}
+
+| Declaration | Meaning |
+| --- | --- |
+| `in donor: model` | One input model |
+| `in a: model` and `in b: model` | Several, one declaration each |
+| `in donors: List<model>` | Any number of input models |
+
+`model` is the name of a built-in type, like `int`: a model of the file's metamodel. It is only
+written as the type of an input, `model` or `List<model>`. A model input is always required, so
+`model?`, a default and `Set<model>` are rejected, and so are `out` declarations of models and
+variables holding a model (`x = donor`). A model value — a model input, or the variable of a loop
+over a `List<model>` — can only be
+
+- the target of a **scope block** `in donor { … }`,
+- an argument of a call, for a `model` or `List<model>` input of the callee,
+- the collection of `for d in donors do { … }`, which makes `d` a model, and
+- asked `donors.size()`, `donors.isEmpty()` or `donors.notEmpty()`.
+
+Anything else — comparing models, member access, passing a model to an element or scalar input — is
+a type error.
+
+**Scope blocks.** Inside any pattern — of a `match`, `if match`, `for match`, `while match` or
+`until match` — the objects of an input model are declared in a block `in name { … }`. Everything
+outside a scope block belongs to the transformed model, exactly as in a transformation without model
+inputs:
+
+| Inside `in donor { … }` | |
+| --- | --- |
+| Objects, links, references to objects of the same model, `var`, `where` | ✅ — they find and read objects of `donor` |
+| `forbid { … }` / `require { … }` | ✅ — the condition graph lives in `donor` |
+| `create` / `delete` on objects or links, `delete name`, assigning a property with `=` | ❌ — input models are read-only |
+| Links to objects outside the block | ❌ — no link connects objects of different models |
+| Another scope block | ❌ — scope blocks do not nest |
+
+A pattern may hold several scope blocks, for the same model or for different ones, and a scope block
+may stand inside a `forbid` or `require` block — `forbid { in donor { … } }` — with the same meaning
+as a condition inside the scope block: the condition graph is looked for in that model.
+
+A scope block decides where its objects are found, not where their names are visible: the objects
+it declares are bound by the match like the pattern's other objects, so they can be **read**
+anywhere after they are bound — in `where` clauses, in property assignments of the transformed
+model's objects (`create n: Component { name = dc.name }`), in `var`s and in scalar outputs. As
+nodes of a pattern they appear only in scope blocks of their model: `dc { … }` in a later
+statement is written inside `in donor { … }` again, and an object of the transformed model is never a
+node inside a scope block.
+
+**Element inputs and outputs denote objects of the transformed model.** An object of an input model
+is never passed to an element input of a call, assigned to an element output, added to an element
+collection output, or used as the source of the elements of a `for … in` loop. Pass the values you
+need — a name, a number — instead.
+
+**Correlating models.** Objects of different models have no identity in common: the engine knows no
+correspondence between an object of the donor and one of the transformed model. Correlate them
+through their attributes, as `name == dc.name` does above. Injective matching is unaffected: objects
+of different models never match the same element, and within one model the usual rules apply.
+
+**Several models.** With `in donors: List<model>` the number of models is open; loop over them and
+open a scope block per model:
+
+<<< @/../samples/crossover/follow-donors.mt{mt}
+
+A call passes models on: `call f(source = donor)` passes a model input, `call f(source = d)` the
+variable of a loop over a `List<model>`, and `call g(all = donors)` the list. The callee reads them
+and still changes the caller's transformed model. A model input must always be passed — there is no
+default — so a file with model inputs cannot be run with the **Run** action; it runs as a crossover
+operator or when another transformation calls it. The configuration cannot pass models either: in an
+optimisation the optimizer binds the donors.
 
 ::: info Reserved words
-`transformation`, `in`, `out`, `call`, `import` and `from` are keywords of the language. A name that
-collides with one of them is written in backticks, e.g. `` `from` ``.
+`in`, `out`, `call`, `import` and `as` are keywords of the language, besides the keywords of patterns
+and statements. A name that collides with one of them is written in backticks, e.g. `` `out` ``.
+`model` is not a keyword but the name of a built-in type, like `int` and `string`.
 :::
 
 ::: info Not yet supported
-Recursion, and passing arguments to a transformation from a configuration
-(`using "x.mt"(k = v)`), are not supported. There is no `try call` that undoes a failed callee's
-changes; `if call` is limited to callees that fail before changing the model instead.
+Recursion is not supported. There is no `try call` that undoes a failed callee's changes; `if call`
+is limited to callees that fail before changing the model instead. Input models are read-only: there
+are no `out` or `inout` models, so a transformation cannot change a second model or produce one. There
+is no correspondence between objects of different models (such as "`c` is the same component as
+`dc`") other than equal attribute values. Arguments from a configuration are passed with
+[`with { }`](/plugins/config-mdeo#operator-arguments).
 :::
 
 ### The generated model transformation language
@@ -377,7 +485,18 @@ memory per traverser matters more than match time. It is read once, at startup.
 
 Transformations have a diagram editor too. Pattern objects and links appear as nodes and edges, with
 their modifier reflected in the styling, so the effect of a rule can be read at a glance. Element
-parameters, call outputs and loop variables appear as bound objects in the patterns that use them.
+inputs, call outputs and loop variables appear as bound objects in the patterns that use them. The
+header — imports and `in` / `out` declarations — is not drawn; edit it in the textual editor.
+
+The elements of a [scope block](#model-inputs) stay in the node of their pattern and are tagged with
+the model they belong to, `«in donor»`, the way the members of a `forbid` or `require` block are
+tagged — combined with the block's tag where both apply, e.g. `«forbid 1, in donor»`. The
+**In Model** entry of the **Change Modifier** menu moves an element, together with everything
+connected to it, into a scope block of the pattern, into a new one for any model input or loop
+variable over a `List<model>` in scope, or back to the **Transformed Model**. It only offers moves
+whose result validates. Elements of an input model offer no *Create* or *Delete*, a link drawn
+between two of them carries no modifier, and no link joins two models. Moving the last element out
+of a scope block, or deleting it, removes the block.
 
 A call is a node on the control flow, drawn with a double left edge, that shows the call's text.
 Double-click the text to edit the call's arguments and outputs. **Insert Statement** on a control
