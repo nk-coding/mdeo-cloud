@@ -99,13 +99,20 @@ data class TypedPatternPropertyAssignment(
  *                  matched node with the same name, allowing property assignments and comparisons on
  *                  already matched nodes.
  * @param properties Property assignments for this object instance.
+ * @param model The name of the model value (a `model` input, or a loop variable over a
+ *   `List<model>` input) whose model the object lives in, when it is declared or referenced inside
+ *   a scope block `in donor { ... }` (also within a `forbid`/`require` block inside one, or one
+ *   inside such a block); null for an object of the implicit model the transformation runs on.
+ *   Objects of a model input are read-only: they are only matched, never created, deleted or
+ *   assigned, and links never connect objects of different models.
  */
 @Serializable
 data class TypedPatternObjectInstance(
     val modifier: String? = null,
     val name: String,
     val className: String? = null,
-    val properties: List<TypedPatternPropertyAssignment>
+    val properties: List<TypedPatternPropertyAssignment>,
+    val model: String? = null
 )
 
 /**
