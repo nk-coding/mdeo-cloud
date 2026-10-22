@@ -461,7 +461,13 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                 ? resolveClassChain(resolvedClass, this.reflection).map((c) => c.name)
                 : undefined;
 
-        const node = GPatternInstanceNode.builder().id(nodeId).name(name).modifier(modifier).meta(metadata).build();
+        const node = GPatternInstanceNode.builder()
+            .id(nodeId)
+            .name(name)
+            .modifier(modifier)
+            .model(scope?.model?.$refText)
+            .meta(metadata)
+            .build();
 
         if (typeName != undefined) {
             node.typeName = typeName;
@@ -551,6 +557,7 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
             .id(nodeId)
             .name(instanceName)
             .modifier(PatternModifierKind.NONE)
+            .model(scope?.model?.$refText)
             .meta(metadata)
             .build();
 
