@@ -559,10 +559,14 @@ class MdeoGraph private constructor(
      * is needed here.
      *
      * @param registry Maps vertex IDs to logical instance names.
+     * @param settle Whether to apply a pending shuffle to the vertex order first (see
+     *   [shuffleVertices]). Without it the graph is only read, never changed, so that several
+     *   threads may read it at once — as when it is loaded as a model input of other graphs, which
+     *   does not depend on the order.
      * @return A fully populated [Model] reflecting the current graph state.
      */
-    internal fun toModel(registry: InstanceNameRegistry): Model {
-        settleVertexList()
+    internal fun toModel(registry: InstanceNameRegistry, settle: Boolean = true): Model {
+        if (settle) settleVertexList()
         val newInstancesByName = LinkedHashMap<String, ModelInstance>(vertexList.size * 2)
         for (vertex in vertexList) {
             val logicalName = registry.getName(vertex.id) ?: vertex.id.toString()

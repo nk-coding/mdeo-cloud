@@ -134,7 +134,8 @@ class MdeoModelGraph private constructor(
      * logical names: the instances a model input of another graph of the same metamodel owns.
      */
     private fun copyInstancesByName(): Map<String, ModelInstance> {
-        val model = toModel()
+        // read-only: a population member may be the donor of several crossovers at once
+        val model = graph.toModel(instanceNameRegistry, settle = false)
         val copies = IdentityHashMap<ModelInstance, ModelInstance>(model.instancesByName.size)
         val byName = LinkedHashMap<String, ModelInstance>(model.instancesByName.size * 2)
         for ((name, instance) in model.instancesByName) {
