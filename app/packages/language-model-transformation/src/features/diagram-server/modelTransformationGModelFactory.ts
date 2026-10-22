@@ -1,5 +1,6 @@
 import type { GModelElement, GModelRoot } from "@eclipse-glsp/server";
-import { declaredClassOf } from "../transformationDeclarations.js";
+import type { AstNode } from "langium";
+import { declaredClassOf, renderParameter } from "../transformationDeclarations.js";
 import {
     sharedImport,
     BaseGModelFactory,
@@ -35,7 +36,8 @@ import {
     type ControlFlowNode,
     type ControlFlowMatchNode,
     type ControlFlowSplitNode,
-    type ControlFlowEndNode
+    type ControlFlowEndNode,
+    type ControlFlowHeaderNode
 } from "./modelTransformationControlFlowConverter.js";
 import { resolveClassChain, type ClassType } from "@mdeo/language-metamodel";
 import { LinkAssociationResolver } from "@mdeo/language-model";
@@ -61,6 +63,7 @@ import { GPatternLinkModifierNode } from "./model/patternLinkModifierNode.js";
 import { GPatternModifierLabel } from "./model/patternModifierLabel.js";
 import { GWhereClauseLabel } from "./model/whereClauseLabel.js";
 import { GVariableLabel } from "./model/variableLabel.js";
+import { GHeaderNode, GHeaderRowLabel, GHeaderTitleLabel } from "./model/headerNode.js";
 import { EndNodeKind, ModelTransformationElementType, PatternModifierKind } from "@mdeo/protocol-model-transformation";
 import { ID } from "@mdeo/language-common";
 import { ModelTransformationIdGenerator } from "./modelTransformationIdGenerator.js";
@@ -75,6 +78,7 @@ import { stereotypeText, whereClauseLabelText } from "./modelTransformationLabel
 
 const { injectable } = sharedImport("inversify");
 const { GGraph } = sharedImport("@eclipse-glsp/server");
+const { UriUtils } = sharedImport("langium");
 
 type GGraphType = ReturnType<typeof GGraph.builder>["proxy"];
 
@@ -123,7 +127,8 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
         const converter = new ModelTransformationControlFlowConverter(
             effectiveSourceModel,
             effectiveIdRegistry,
-            this.reflection
+            this.reflection,
+            this.includesHeader()
         );
         const cfg = converter.convert();
 
@@ -138,6 +143,16 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     }
 
     /**
+     * Whether the diagram shows the header box of the transformation (its imports and
+     * declarations) above the start node.
+     *
+     * @returns `true`; diagrams of transformations that have no header in source override this
+     */
+    protected includesHeader(): boolean {
+        return true;
+    }
+
+    /**
      * Dispatches a single control-flow graph node to the appropriate GModel creator.
      *
      * @param graph The graph to add elements to.
@@ -147,6 +162,12 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
     private async createCFGNode(graph: GGraphType, node: ControlFlowNode, idRegistry: ModelIdRegistry): Promise<void> {
         const validatedMetadata = await this.modelState.getValidatedMetadata();
         switch (node.kind) {
+            case "header": {
+                graph.children.push(
+                    this.createHeaderNode(node, this.getNodeMetadata(validatedMetadata, node.id), idRegistry)
+                );
+                break;
+            }
             case "start": {
                 const metadata = this.getNodeMetadata(validatedMetadata, node.id);
                 graph.children.push(GStartNode.builder().id(node.id).meta(metadata).build());
@@ -188,6 +209,82 @@ export class ModelTransformationGModelFactory extends BaseGModelFactory<ModelTra
                 break;
             }
         }
+    }
+
+    /**
+     * Creates the header box: a title (the file's name), the path imports and the `in` / `out`
+     * declarations, each import and declaration a row holding its source line, editable and
+     * deletable. A section without lines is left out (the editor notes in a box without
+     * declarations that the transformation takes no inputs or outputs).
+     *
+     * The id of a row is the id of its import or declaration, so that edits, deletions and
+     * validation markers find the line behind it.
+     *
+     * @param node The header node of the control flow graph
+     * @param metadata The layout metadata of the box
+     * @param idRegistry The model ID registry
+     * @returns The header box
+     */
+    createHeaderNode(
+        node: ControlFlowHeaderNode,
+        metadata: NodeLayoutMetadata,
+        idRegistry: ModelIdRegistry
+    ): GHeaderNode {
+        const header = GHeaderNode.builder().id(node.id).meta(metadata).build();
+
+        const document = this.modelState.sourceModel?.$document;
+        const title = document != undefined ? UriUtils.basename(document.uri) : "Transformation";
+        const titleCompartment = GCompartment.builder()
+            .type(ModelTransformationElementType.COMPARTMENT)
+            .id(`${node.id}__title`)
+            .build();
+        titleCompartment.children.push(GHeaderTitleLabel.builder().id(`${node.id}__title-label`).text(title).build());
+        header.children.push(titleCompartment);
+
+        const imports = node.imports.map((fileImport) =>
+            GHeaderRowLabel.importBuilder()
+                .id(idRegistry.getIdOrUnresolved(fileImport))
+                .text(this.sourceLine(fileImport, `import "${fileImport.file ?? ""}" as ${fileImport.name ?? "?"}`))
+                .build()
+        );
+        const declarations = node.parameters.map((parameter) =>
+            GHeaderRowLabel.declarationBuilder()
+                .id(idRegistry.getIdOrUnresolved(parameter))
+                .text(this.sourceLine(parameter, renderParameter(parameter)))
+                .build()
+        );
+        for (const [section, rows] of [
+            ["imports", imports],
+            ["declarations", declarations]
+        ] as const) {
+            if (rows.length === 0) {
+                continue;
+            }
+            header.children.push(
+                GHorizontalDivider.builder()
+                    .type(ModelTransformationElementType.DIVIDER)
+                    .id(`${node.id}__${section}-divider`)
+                    .build()
+            );
+            const compartment = GCompartment.builder()
+                .type(ModelTransformationElementType.COMPARTMENT)
+                .id(`${node.id}__${section}`)
+                .build();
+            compartment.children.push(...rows);
+            header.children.push(compartment);
+        }
+        return header;
+    }
+
+    /**
+     * Returns the source text of a node on one line.
+     *
+     * @param node The node
+     * @param fallback The text when the node has no source text
+     * @returns The text
+     */
+    private sourceLine(node: AstNode, fallback: string): string {
+        return (node.$cstNode?.text ?? fallback).replace(/\s+/g, " ").trim();
     }
 
     /**

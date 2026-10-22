@@ -31,6 +31,22 @@ export enum ModelTransformationElementType {
      */
     LABEL_CALL = "label:call",
     /**
+     * Header box of the transformation: its path imports and its `in` / `out` declarations
+     */
+    NODE_HEADER = "node:header",
+    /**
+     * Title of the header box (the transformation's file name)
+     */
+    LABEL_HEADER_TITLE = "label:header-title",
+    /**
+     * Editable row of the header box holding a path import (`import "./x.mt" as x`)
+     */
+    LABEL_HEADER_IMPORT = "label:header-import",
+    /**
+     * Editable row of the header box holding an `in` / `out` declaration
+     */
+    LABEL_HEADER_DECLARATION = "label:header-declaration",
+    /**
      * Control flow edge connecting nodes
      */
     EDGE_CONTROL_FLOW = "edge:control-flow",
@@ -173,6 +189,28 @@ export enum NodeCreationMode {
     /** The element goes into a `forbid` block. */
     FORBID = "forbid"
 }
+
+/**
+ * The arguments the model transformation toolbox sends with its request for palette items.
+ */
+export interface ModelTransformationToolboxArgs {
+    /** The creation mode selected in the toolbox. */
+    mode?: NodeCreationMode;
+    /**
+     * The model new pattern instances are created in: the name of a model value (a `model`
+     * input or a loop variable over a `List<model>` input), whose objects go into a scope block
+     * `in name { … }`; absent (or empty) for the transformed model.
+     */
+    model?: string;
+}
+
+/**
+ * Id of the palette group through which the server tells the toolbox which models new pattern
+ * instances can be created in; the toolbox shows them in its target-model selector instead of
+ * as palette items. Every child item stands for one model value: its `id` is the value's name,
+ * its `label` the text shown for it.
+ */
+export const TARGET_MODELS_PALETTE_GROUP_ID = "target-models";
 
 /**
  * The create-edge context the model transformation editor sends with a connection request.

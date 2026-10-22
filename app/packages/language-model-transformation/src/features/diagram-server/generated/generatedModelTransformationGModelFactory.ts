@@ -13,6 +13,15 @@ const { GGraph } = sharedImport("@eclipse-glsp/server");
  */
 @injectable()
 export class GeneratedModelTransformationGModelFactory extends ModelTransformationGModelFactory {
+    /**
+     * A generated transformation is shown from its typed AST, which has no header in source.
+     *
+     * @returns `false`
+     */
+    protected override includesHeader(): boolean {
+        return false;
+    }
+
     override async createModelInternal(
         sourceModel: PartialGeneratedModelTransformation,
         _idRegistry: ModelIdRegistry

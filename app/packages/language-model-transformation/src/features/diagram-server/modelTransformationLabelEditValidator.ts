@@ -8,6 +8,11 @@ import {
     PatternPropertyAssignment,
     PatternVariable,
     PatternVariableReassignment,
+    TransformationFileImport,
+    TransformationParameter,
+    type ModelTransformationType,
+    type TransformationFileImportType,
+    type TransformationParameterType,
     type PatternObjectInstanceType,
     type PatternPropertyAssignmentType,
     type PatternVariableType
@@ -27,6 +32,14 @@ import {
 } from "./handler/addVariableOperationHandler.js";
 import { NEW_WHERE_CLAUSE_LABEL_PREFIX } from "./handler/addWhereClauseOperationHandler.js";
 import { effectivePatternModifier } from "./modelTransformationPatternUtils.js";
+import { TransformationDeclarationResolver } from "../transformationDeclarations.js";
+import {
+    checkHeaderLineParses,
+    declaredNames,
+    NEW_HEADER_LABEL_PREFIX,
+    parseHeaderLine,
+    unquotedName
+} from "./modelTransformationHeader.js";
 
 const { injectable, inject } = sharedImport("inversify");
 const { ValidationStatus, GModelIndex: GModelIndexKey } = sharedImport("@eclipse-glsp/server");
@@ -72,6 +85,9 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
                 return this.validateModifierLabel(label) ?? ValidationStatus.NONE;
             case ModelTransformationElementType.LABEL_CONTROL_FLOW:
                 return this.validateControlFlowLabel(label) ?? ValidationStatus.NONE;
+            case ModelTransformationElementType.LABEL_HEADER_IMPORT:
+            case ModelTransformationElementType.LABEL_HEADER_DECLARATION:
+                return this.validateHeaderLine(label, this.headerLineOf(element)) ?? ValidationStatus.NONE;
             case ModelTransformationElementType.LABEL_CALL:
                 return label.trim().startsWith("call ")
                     ? ValidationStatus.NONE
@@ -93,12 +109,16 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
      *   name uniqueness.
      * - {@link NEW_WHERE_CLAUSE_LABEL_PREFIX} — new where-clause placeholder; validates the
      *   {@code where } prefix and non-empty expression.
+     * - {@link NEW_HEADER_LABEL_PREFIX} — new row of the header box; validates the header line.
      *
      * @param text The label text currently being entered
      * @param modelElementId The temporary label element ID
      * @returns Validation status for the in-progress edit
      */
     override validateUnknown(text: string, modelElementId: string): ValidationStatusType {
+        if (modelElementId.startsWith(NEW_HEADER_LABEL_PREFIX)) {
+            return this.validateHeaderLine(text, undefined) ?? ValidationStatus.NONE;
+        }
         if (modelElementId.startsWith(NEW_PROPERTY_COMPARISON_LABEL_PREFIX)) {
             if (text.trim().length === 0) {
                 return ValidationStatus.NONE;
@@ -122,6 +142,92 @@ export class ModelTransformationLabelEditValidator extends BaseLabelEditValidato
             return this.validateWhereClauseLabel(text) ?? ValidationStatus.NONE;
         }
         return ValidationStatus.NONE;
+    }
+
+    /**
+     * Returns the import or declaration behind a row of the header box.
+     *
+     * @param element The row
+     * @returns The import or declaration, or undefined when the row has none
+     */
+    private headerLineOf(
+        element: GModelElement
+    ): TransformationFileImportType | TransformationParameterType | undefined {
+        const astNode = this.index.getAstNode(element);
+        if (
+            astNode != undefined &&
+            (this.reflection.isInstance(astNode, TransformationFileImport) ||
+                this.reflection.isInstance(astNode, TransformationParameter))
+        ) {
+            return astNode as TransformationFileImportType | TransformationParameterType;
+        }
+        return undefined;
+    }
+
+    /**
+     * Validates a line of the header box: an import (`import "./x.mt" as x`) or a declaration
+     * (`in name: Type [= default]`, `out name: Type`).
+     *
+     * The line has to have the shape of a header line, its name must not be declared anywhere
+     * else in the file (names are file-global), and the file must parse with the line in place;
+     * whether its type or path resolves is reported by the validation of the file afterwards.
+     * An empty existing row deletes its line; an empty new row is discarded.
+     *
+     * @param text The edited line
+     * @param replaced The import or declaration the row holds, undefined for a new row
+     * @returns A validation status if invalid, undefined if valid
+     */
+    private validateHeaderLine(
+        text: string,
+        replaced: TransformationFileImportType | TransformationParameterType | undefined
+    ): ValidationStatusType | undefined {
+        if (text.trim().length === 0) {
+            return undefined;
+        }
+        const parsed = parseHeaderLine(text);
+        if (parsed == undefined) {
+            return this.error(
+                'Expected a header line: in name: Type [= default], out name: Type or import "./file.mt" as alias'
+            );
+        }
+        const nameValidation = this.validateRawIdentifier(parsed.name, parsed.kind === "import" ? "Alias" : "Name");
+        if (nameValidation != undefined) {
+            return nameValidation;
+        }
+
+        const root = this.modelState.sourceModel as ModelTransformationType | undefined;
+        const document = root?.$document;
+        if (root == undefined || document == undefined) {
+            return undefined;
+        }
+        const name = unquotedName(parsed.name);
+        const names = declaredNames(root);
+        // an optional element input shares its name with the object of the first pattern it pins
+        const pins =
+            parsed.kind === "in" &&
+            parsed.type.trim().endsWith("?") &&
+            new TransformationDeclarationResolver(
+                this.reflection,
+                this.modelState.languageServices.shared.workspace.LangiumDocuments
+            )
+                .firstPatternObjects(root)
+                .some((object) => object.name === name);
+        if (name !== replaced?.name && names.has(name) && !pins) {
+            return this.error(`The name '${name}' is used already in this file.`);
+        }
+
+        const parser = this.modelState.languageServices.parser.LangiumParser;
+        const syntaxError = checkHeaderLineParses(
+            root,
+            document,
+            (source) => {
+                const result = parser.parse(source);
+                return [...result.lexerErrors, ...result.parserErrors];
+            },
+            text,
+            replaced
+        );
+        return syntaxError != undefined ? this.error(`Invalid header line: ${syntaxError}`) : undefined;
     }
 
     /**

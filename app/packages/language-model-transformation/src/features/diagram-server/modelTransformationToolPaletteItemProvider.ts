@@ -3,6 +3,15 @@ import type { ModelState } from "@mdeo/language-shared";
 import { BaseToolPaletteItemProvider, sharedImport } from "@mdeo/language-shared";
 import type { ModelTransformationType } from "../../grammar/modelTransformationTypes.js";
 import type { TriggerActionOperation } from "@mdeo/protocol-common";
+import { TARGET_MODELS_PALETTE_GROUP_ID } from "@mdeo/protocol-model-transformation";
+import { HEADER_NODE_ID, headerLineTemplates, targetModels } from "./modelTransformationHeader.js";
+import { buildInsertHeaderLineAction } from "./handler/addHeaderDeclarationOperationHandler.js";
+
+/**
+ * The action type of the dialog importing another transformation (see
+ * {@link ImportTransformationActionHandler}).
+ */
+export const IMPORT_TRANSFORMATION_ACTION = "import-transformation";
 
 const { injectable, inject } = sharedImport("inversify");
 const { ModelState: ModelStateKey } = sharedImport("@eclipse-glsp/server");
@@ -16,7 +25,12 @@ const { ModelState: ModelStateKey } = sharedImport("@eclipse-glsp/server");
  * - Create: One item per class for creating new pattern instances (abstract classes are
  *   only offered when the selected modifier is not "create", since they cannot be instantiated)
  * - Add Instance: Items for referencing/deleting already-declared instances (persist/delete mode only)
+ * - Declarations: Items adding a line to the header (an input, an output, a model input, a list
+ *   of model inputs, an import of another transformation)
  * - Setup: Shown when the metamodel import is missing
+ *
+ * It also lists the models new pattern instances can be created in, in a group the toolbox shows
+ * as its target-model selector (see {@link TARGET_MODELS_PALETTE_GROUP_ID}).
  */
 @injectable()
 export class ModelTransformationToolPaletteItemProvider extends BaseToolPaletteItemProvider {
@@ -78,7 +92,80 @@ export class ModelTransformationToolPaletteItemProvider extends BaseToolPaletteI
             });
         }
 
+        const declarationItems = this.createDeclarationPaletteItems(sourceModel!);
+        if (declarationItems.length > 0) {
+            result.push({
+                id: "declarations-group",
+                label: "Declarations",
+                actions: [],
+                children: declarationItems,
+                icon: "symbol-parameter",
+                sortString: "C"
+            });
+        }
+
+        result.push({
+            id: TARGET_MODELS_PALETTE_GROUP_ID,
+            label: "Target Models",
+            actions: [],
+            children: targetModels(sourceModel!, this.modelState.languageServices.shared.AstReflection).map(
+                (model) => ({ id: model.name, label: model.label, sortString: model.name, actions: [] })
+            ),
+            sortString: "Z"
+        });
+
         return result;
+    }
+
+    /**
+     * Creates the items adding a line to the header of the transformation. The declarations
+     * insert a prefilled, fresh row into the header box and start editing it; the import opens
+     * a dialog choosing the transformation to import.
+     *
+     * @param sourceModel The transformation
+     * @returns The palette items, or none while the diagram has no header box
+     */
+    protected createDeclarationPaletteItems(sourceModel: ModelTransformationType): PaletteItem[] {
+        const header = this.modelState.index.find(HEADER_NODE_ID);
+        if (header == undefined) {
+            return [];
+        }
+        const templates = headerLineTemplates(sourceModel);
+        const items: PaletteItem[] = [];
+        const lines: [string, string, string][] = [
+            ["input", "Input", templates.input],
+            ["output", "Output", templates.output],
+            ["model", "Model Input", templates.model],
+            ["model-list", "Model List Input", templates.modelList]
+        ];
+        for (const [id, label, text] of lines) {
+            const action = buildInsertHeaderLineAction(header, text);
+            if (action != undefined) {
+                items.push({
+                    id: `declaration-${id}`,
+                    sortString: `${items.length}`,
+                    label,
+                    actions: [action]
+                });
+            }
+        }
+
+        const importOperation: TriggerActionOperation = {
+            kind: "triggerAction",
+            actionType: IMPORT_TRANSFORMATION_ACTION,
+            languageId: this.modelState.languageServices.LanguageMetaData.languageId,
+            data: {
+                uri: this.modelState.sourceUri ?? ""
+            },
+            isOperation: true
+        };
+        items.push({
+            id: "declaration-import",
+            sortString: `${items.length}`,
+            label: "Import…",
+            actions: [importOperation]
+        });
+        return items;
     }
 
     /**

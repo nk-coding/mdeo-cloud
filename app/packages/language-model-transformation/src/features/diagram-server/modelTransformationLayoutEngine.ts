@@ -15,6 +15,7 @@ import { GEndNode } from "./model/endNode.js";
 import { GSplitNode } from "./model/splitNode.js";
 import { GMergeNode } from "./model/mergeNode.js";
 import { MATCH_NODE_INNER_PADDING } from "@mdeo/protocol-model-transformation";
+import { GHeaderNode } from "./model/headerNode.js";
 
 const { injectable } = sharedImport("inversify");
 
@@ -40,6 +41,12 @@ const COMPARTMENT_CHAR_WIDTH = 9;
 const COMPARTMENT_HORIZONTAL_MARGIN = 24;
 
 /**
+ * Id of the edge that only the layout sees, from the header box to the start node, which places
+ * the header box above the control flow. No metadata is stored for it.
+ */
+const HEADER_LAYOUT_EDGE_ID = "__header-above-start";
+
+/**
  * Length of the control flow arrow head.
  */
 const CONTROL_FLOW_ARROW = { length: 12, width: 12 };
@@ -48,7 +55,8 @@ const CONTROL_FLOW_ARROW = { length: 12, width: 12 };
  * Layout engine for model transformation diagrams.
  *
  * Match nodes are containers: their pattern instances and pattern links are laid out first (left to right), then the
- * control flow is laid out top down with the match nodes at the size the client draws them at.
+ * control flow is laid out top down with the match nodes at the size the client draws them at. The header box sits
+ * above the start node, joined to it by an edge only the layout sees.
  */
 @injectable()
 export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
@@ -104,6 +112,11 @@ export class ModelTransformationLayoutEngine extends BaseLayoutEngine {
             } else if (child instanceof GNode) {
                 input.nodes.push({ id: child.id, ...this.sizeOf(child.id, bounds) });
             }
+        }
+        const header = model.children.find((child) => child instanceof GHeaderNode);
+        const start = model.children.find((child) => child instanceof GStartNode);
+        if (header != undefined && start != undefined) {
+            input.edges.push({ id: HEADER_LAYOUT_EDGE_ID, sourceId: header.id, targetId: start.id, labels: [] });
         }
         for (const child of model.children) {
             if (child instanceof GEdge) {
