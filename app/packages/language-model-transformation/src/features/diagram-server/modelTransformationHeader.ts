@@ -24,7 +24,7 @@ export const NEW_DECLARATION_LABEL_PREFIX = "__new-label-declaration-";
  * nodes: the implicit end after the last statement when the flow reaches it, otherwise the
  * first `stop`. Every successful end lists the outputs, but only the rows of the primary end
  * carry the ids of the declarations themselves (validation markers of an output show there),
- * and new outputs are added there.
+ * and the toolbox adds new outputs there.
  *
  * @param stopNodeIds The ids of the `stop` end nodes, in graph order
  * @returns The id, or undefined when the transformation never ends successfully

@@ -490,9 +490,9 @@ inputs, call outputs and loop variables appear as bound objects in the patterns 
 The declarations are drawn where they take effect: the start node lists the `in` declarations and
 every successful end — the end after the last statement and each `stop` — lists the `out`
 declarations, one row each, written as in the source (`in maxCandidates: int = 0`,
-`out moved: Component`). A `kill` lists none, since it discards the result. Without inputs (or
-outputs) the node is the plain start dot (or end bullseye); with them it becomes a box with the
-symbol at the top and the rows below. Imports are not drawn; see them in the textual editor.
+`out moved: Component`). A `kill` lists none, since it discards the result. The rows are plain
+text next to the node's symbol, without a frame: the inputs above the start dot, the outputs below
+the end bullseye. Imports are not drawn; see them in the textual editor.
 
 Double-click a row (or select it and press F2) to edit the declaration: a new name is renamed
 wherever the file uses it — for an optional element input also the object of the first pattern it
@@ -506,11 +506,12 @@ stay and are reported by the validation. Errors and warnings of an input are sho
 node, those of an output on the end after the last statement (or, without one, on the first
 `stop`).
 
-The toolbox's **Declarations** group adds header lines. **Input**, **Model Input** and **Model List
-Input** add a row with a fresh name — `in input1: int`, `in donor1: model`, `in donors1: List<model>`
-— to the start node, **Output** adds `out output1: int` to the end after the last statement (it is
-missing when the transformation never ends successfully), and each opens the row for editing with
-the name selected; Enter or clicking elsewhere keeps it, Escape discards it. The line goes where the
+Select the start node for the actions **Add Input**, **Add Model Input** and **Add Model List
+Input**, which add a row with a fresh name — `in input1: int`, `in donor1: model`,
+`in donors1: List<model>` — and a successful end for **Add Output**, which adds `out output1: int`.
+The toolbox's **Declarations** group has the same items (its **Output** adds the row to the end
+after the last statement and is missing when the transformation never ends successfully). Each
+opens the row for editing with the name selected; Enter or clicking elsewhere keeps it, Escape discards it. The line goes where the
 textual editor's formatting puts it: inputs after the other inputs, outputs last, all after the
 imports. **Import…** opens a dialog to pick a `.mt` file of the project and, optionally, the alias,
 which defaults to the file name in camel case (`move-component.mt` becomes `moveComponent`),

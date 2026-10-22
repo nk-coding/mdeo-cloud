@@ -3,7 +3,7 @@ import type { VNode } from "snabbdom";
 import { sharedImport, GNodeView, type GNode } from "@mdeo/editor-shared";
 import type { GEndNode } from "../model/endNode.js";
 import { EndNodeKind } from "@mdeo/protocol-model-transformation";
-import { hasDeclarationRows, renderDeclarationBox } from "./declarationBox.js";
+import { hasDeclarationRows, renderDeclarationText } from "./declarationText.js";
 
 const { injectable } = sharedImport("inversify");
 const { html } = sharedImport("@eclipse-glsp/sprotty");
@@ -14,8 +14,8 @@ const { html } = sharedImport("@eclipse-glsp/sprotty");
  * - STOP: Filled circle with hollow outer ring (bullseye)
  * - KILL: X mark (cross)
  * Uses HTML divs so the bounding box correctly includes the border (box-border).
- * A successful end of a transformation with outputs lists them below a smaller bullseye, in a
- * box.
+ * A successful end of a transformation with outputs lists them below the bullseye, as plain
+ * text.
  */
 @injectable()
 export class GEndNodeView extends GNodeView {
@@ -47,7 +47,7 @@ export class GEndNodeView extends GNodeView {
             return this.renderKillNode();
         }
         if (hasDeclarationRows(children)) {
-            return renderDeclarationBox(this.renderStopNode(20), context, children);
+            return renderDeclarationText(this.renderStopNode(GEndNodeView.OUTER_RADIUS * 2), context, children, "below");
         }
         return this.renderStopNode(GEndNodeView.OUTER_RADIUS * 2);
     }
