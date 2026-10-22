@@ -14,11 +14,9 @@ import {
     WhileExpressionStatement,
     ElseIfBranch,
     CallStatement,
-    TransformationFileImport,
     TransformationParameter,
     type CallStatementType,
     type ModelTransformationType,
-    type TransformationFileImportType,
     type TransformationParameterType,
     type PatternObjectInstanceType,
     type PatternPropertyAssignmentType,
@@ -42,7 +40,7 @@ import { headerLineDeletionRange, parseHeaderLine } from "../modelTransformation
 import { TransformationDeclarationResolver } from "../../transformationDeclarations.js";
 
 const { injectable } = sharedImport("inversify");
-const { GrammarUtils, AstUtils } = sharedImport("langium");
+const { GrammarUtils } = sharedImport("langium");
 
 /**
  * Handler for applying label edit operations in model transformation diagrams.
@@ -52,9 +50,8 @@ const { GrammarUtils, AstUtils } = sharedImport("langium");
  * - Pattern property assignment labels (`propName = expr` or `propName == expr`)
  * - Where clause expression labels (plain text replacement)
  * - Variable declaration labels (`var name[: type] = expr`, name and expression are updated)
- * - Rows of the header box: imports (`import "./x.mt" as x`) and declarations
- *   (`in name: Type [= default]`, `out name: Type`); a renamed alias or declaration is renamed
- *   wherever it is used
+ * - Declaration rows of the start node (`in name: Type [= default]`) and of the end nodes
+ *   (`out name: Type`); a renamed declaration is renamed wherever it is used
  */
 @injectable()
 export class ModelTransformationApplyLabelEditOperationHandler extends BaseApplyLabelEditOperationHandler {
@@ -106,22 +103,16 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
         if (this.reflection.isInstance(node, TransformationParameter)) {
             return await this.createDeclarationEdit(node as TransformationParameterType, operation.text);
         }
-        if (this.reflection.isInstance(node, TransformationFileImport)) {
-            return await this.createImportEdit(node as TransformationFileImportType, operation.text);
-        }
         return undefined;
     }
 
     /**
-     * Creates a workspace edit deleting a header line, for a row of the header box edited to be
-     * empty.
+     * Creates a workspace edit deleting a declaration, for a row edited to be empty.
      *
-     * @param node The import or declaration
+     * @param node The declaration
      * @returns The workspace edit, or undefined without source
      */
-    private deleteHeaderLine(
-        node: TransformationFileImportType | TransformationParameterType
-    ): WorkspaceEdit | undefined {
+    private deleteHeaderLine(node: TransformationParameterType): WorkspaceEdit | undefined {
         const root = node.$container as ModelTransformationType;
         const document = this.getSourceDocument();
         const range = headerLineDeletionRange(root, document, node, new Set([node]));
@@ -228,61 +219,6 @@ export class ModelTransformationApplyLabelEditOperationHandler extends BaseApply
             });
         }
         return { changes };
-    }
-
-    /**
-     * Creates a workspace edit for an edited import row (`import "./x.mt" as x`). The path is
-     * replaced as written; a new alias renames the import and every call of it. An empty row
-     * deletes the import.
-     *
-     * @param node The import
-     * @param text The edited line
-     * @returns The workspace edit, or undefined when the line is no import
-     */
-    private async createImportEdit(
-        node: TransformationFileImportType,
-        text: string
-    ): Promise<WorkspaceEdit | undefined> {
-        if (text.trim().length === 0) {
-            return this.deleteHeaderLine(node);
-        }
-        const parsed = parseHeaderLine(text);
-        const cst = node.$cstNode;
-        if (parsed?.kind !== "import" || cst == undefined) {
-            return undefined;
-        }
-        const document = this.getSourceDocument();
-        const uri = document.uri.toString();
-        const serializer = this.modelState.languageServices.AstSerializer;
-        const edits: WorkspaceEdit[] = [];
-
-        const fileNode = GrammarUtils.findNodeForProperty(cst, "file");
-        if (fileNode != undefined && parsed.file !== node.file) {
-            edits.push({ changes: { [uri]: [{ range: fileNode.range, newText: `"${parsed.file}"` }] } });
-        }
-
-        const nameNode = GrammarUtils.findNodeForProperty(cst, "name");
-        const newName = parseIdentifier(parsed.name);
-        if (nameNode != undefined && newName !== node.name) {
-            const serializedName = serializer.serializePrimitive({ value: newName }, ID);
-            edits.push({ changes: { [uri]: [{ range: nameNode.range, newText: serializedName }] } });
-            // a call names the imported transformation by its alias
-            const root = node.$container as ModelTransformationType;
-            for (const call of AstUtils.streamAllContents(root)) {
-                if (!this.reflection.isInstance(call, CallStatement)) {
-                    continue;
-                }
-                const callStatement = call as CallStatementType;
-                const calleeNode =
-                    callStatement.$cstNode != undefined
-                        ? GrammarUtils.findNodeForProperty(callStatement.$cstNode, "callee")
-                        : undefined;
-                if (calleeNode != undefined && callStatement.callee?.$refText === node.name) {
-                    edits.push({ changes: { [uri]: [{ range: calleeNode.range, newText: serializedName }] } });
-                }
-            }
-        }
-        return this.mergeWorkspaceEdits(edits);
     }
 
     /**

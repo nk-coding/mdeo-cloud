@@ -31,21 +31,10 @@ export enum ModelTransformationElementType {
      */
     LABEL_CALL = "label:call",
     /**
-     * Header box of the transformation: its path imports and its `in` / `out` declarations
+     * Editable row of the start node (an `in` declaration) or of a successful end node (an
+     * `out` declaration), holding the declaration as written
      */
-    NODE_HEADER = "node:header",
-    /**
-     * Title of the header box (the transformation's file name)
-     */
-    LABEL_HEADER_TITLE = "label:header-title",
-    /**
-     * Editable row of the header box holding a path import (`import "./x.mt" as x`)
-     */
-    LABEL_HEADER_IMPORT = "label:header-import",
-    /**
-     * Editable row of the header box holding an `in` / `out` declaration
-     */
-    LABEL_HEADER_DECLARATION = "label:header-declaration",
+    LABEL_DECLARATION = "label:declaration",
     /**
      * Control flow edge connecting nodes
      */

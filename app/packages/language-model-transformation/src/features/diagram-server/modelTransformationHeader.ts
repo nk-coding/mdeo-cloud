@@ -14,15 +14,48 @@ import { getModelShape } from "../transformationDeclarations.js";
 const { AstUtils } = sharedImport("langium");
 
 /**
- * The id of the header box in the diagram.
+ * Prefix of the ids of new (not yet committed) rows of a start or end node; followed by the
+ * direction of the declaration the row adds (`in` or `out`).
  */
-export const HEADER_NODE_ID = "header";
+export const NEW_DECLARATION_LABEL_PREFIX = "__new-label-declaration-";
 
 /**
- * Prefix of the ids of new (not yet committed) rows of the header box; followed by the kind of
- * the row (`import` or `declaration`).
+ * Returns the primary successful end of a transformation among the ids of its `stop` end
+ * nodes: the implicit end after the last statement when the flow reaches it, otherwise the
+ * first `stop`. Every successful end lists the outputs, but only the rows of the primary end
+ * carry the ids of the declarations themselves (validation markers of an output show there),
+ * and new outputs are added there.
+ *
+ * @param stopNodeIds The ids of the `stop` end nodes, in graph order
+ * @returns The id, or undefined when the transformation never ends successfully
  */
-export const NEW_HEADER_LABEL_PREFIX = "__new-label-header-";
+export function primaryEndNodeId(stopNodeIds: readonly string[]): string | undefined {
+    return stopNodeIds.includes("implicit_end") ? "implicit_end" : stopNodeIds[0];
+}
+
+/**
+ * Returns the id of the compartment of a start or end node that holds its declaration rows.
+ *
+ * @param nodeId The id of the start or end node
+ * @returns The compartment id
+ */
+export function declarationsCompartmentId(nodeId: string): string {
+    return `${nodeId}__declarations`;
+}
+
+/**
+ * Returns the id of the row listing a declaration in a node: the declaration's own id in the
+ * start node and in the primary end, made unique for the other ends. Any of them resolves to the
+ * declaration, since element ids are resolved up to their first `__`.
+ *
+ * @param declarationId The id of the declaration
+ * @param nodeId The id of the start or end node listing it
+ * @param primary Whether the node holds the declaration's own row
+ * @returns The row id
+ */
+export function declarationRowId(declarationId: string, nodeId: string, primary: boolean): string {
+    return primary ? declarationId : `${declarationId}__at-${nodeId}`;
+}
 
 /**
  * What a header line declares: a path import, an input or an output.

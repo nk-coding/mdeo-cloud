@@ -10,15 +10,6 @@ const { injectable } = sharedImport("inversify");
  */
 @injectable()
 export class GeneratedModelTransformationMetadataManager extends ModelTransformationMetadataManager {
-    /**
-     * A generated transformation is shown from its typed AST, which has no header in source.
-     *
-     * @returns `false`
-     */
-    protected override includesHeader(): boolean {
-        return false;
-    }
-
     protected override extractGraphMetadata(sourceModel: PartialGeneratedModelTransformation): GraphMetadata {
         const adaptedRoot = adaptGeneratedModelTransformationRoot(sourceModel);
         if (adaptedRoot == undefined) {

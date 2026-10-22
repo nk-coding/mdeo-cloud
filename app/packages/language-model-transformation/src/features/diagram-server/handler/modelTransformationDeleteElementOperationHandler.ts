@@ -56,7 +56,7 @@ const { AstUtils } = sharedImport("langium");
  * - Split nodes for if/while expression statements (which deletes the entire statement)
  * - Call nodes, loop heads and assignments (the call of an `if call` deletes the whole
  *   `if call` statement)
- * - Rows of the header box: path imports and `in` / `out` declarations
+ * - Declaration rows of the start node (inputs) and of the end nodes (outputs)
  *
  * Transitive closure rules:
  * - Deleting an instance also deletes all pattern links in the same pattern that reference

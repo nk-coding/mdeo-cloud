@@ -3,9 +3,14 @@ import type { ModelState } from "@mdeo/language-shared";
 import { BaseToolPaletteItemProvider, sharedImport } from "@mdeo/language-shared";
 import type { ModelTransformationType } from "../../grammar/modelTransformationTypes.js";
 import type { TriggerActionOperation } from "@mdeo/protocol-common";
-import { TARGET_MODELS_PALETTE_GROUP_ID } from "@mdeo/protocol-model-transformation";
-import { HEADER_NODE_ID, headerLineTemplates, targetModels } from "./modelTransformationHeader.js";
-import { buildInsertHeaderLineAction } from "./handler/addHeaderDeclarationOperationHandler.js";
+import {
+    EndNodeKind,
+    ModelTransformationElementType,
+    TARGET_MODELS_PALETTE_GROUP_ID
+} from "@mdeo/protocol-model-transformation";
+import type { GModelElement } from "@eclipse-glsp/server";
+import { headerLineTemplates, primaryEndNodeId, targetModels } from "./modelTransformationHeader.js";
+import { buildInsertDeclarationAction } from "./handler/addHeaderDeclarationOperationHandler.js";
 
 /**
  * The action type of the dialog importing another transformation (see
@@ -118,28 +123,35 @@ export class ModelTransformationToolPaletteItemProvider extends BaseToolPaletteI
     }
 
     /**
-     * Creates the items adding a line to the header of the transformation. The declarations
-     * insert a prefilled, fresh row into the header box and start editing it; the import opens
-     * a dialog choosing the transformation to import.
+     * Creates the items adding a line to the header of the transformation. An input inserts a
+     * prefilled, fresh row into the start node, an output into the primary successful end node
+     * (see {@link primaryEndNodeId}; without one there is no Output item), and starts editing
+     * it; the import opens a dialog choosing the transformation to import.
      *
      * @param sourceModel The transformation
-     * @returns The palette items, or none while the diagram has no header box
+     * @returns The palette items
      */
     protected createDeclarationPaletteItems(sourceModel: ModelTransformationType): PaletteItem[] {
-        const header = this.modelState.index.find(HEADER_NODE_ID);
-        if (header == undefined) {
-            return [];
-        }
+        const root = this.modelState.root;
+        const start = root?.children.find((child) => child.type === ModelTransformationElementType.NODE_START);
+        const stopNodes = (root?.children ?? []).filter(
+            (child) =>
+                child.type === ModelTransformationElementType.NODE_END &&
+                (child as { kind?: EndNodeKind }).kind === EndNodeKind.STOP
+        );
+        const primaryEndId = primaryEndNodeId(stopNodes.map((node) => node.id));
+        const end = stopNodes.find((node) => node.id === primaryEndId);
+
         const templates = headerLineTemplates(sourceModel);
         const items: PaletteItem[] = [];
-        const lines: [string, string, string][] = [
-            ["input", "Input", templates.input],
-            ["output", "Output", templates.output],
-            ["model", "Model Input", templates.model],
-            ["model-list", "Model List Input", templates.modelList]
+        const lines: [string, string, string, GModelElement | undefined][] = [
+            ["input", "Input", templates.input, start],
+            ["output", "Output", templates.output, end],
+            ["model", "Model Input", templates.model, start],
+            ["model-list", "Model List Input", templates.modelList, start]
         ];
-        for (const [id, label, text] of lines) {
-            const action = buildInsertHeaderLineAction(header, text);
+        for (const [id, label, text, node] of lines) {
+            const action = node != undefined ? buildInsertDeclarationAction(node, text) : undefined;
             if (action != undefined) {
                 items.push({
                     id: `declaration-${id}`,

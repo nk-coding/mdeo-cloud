@@ -1,24 +1,23 @@
-import {
-    BaseOperationHandler,
-    GCompartment,
-    GHorizontalDivider,
-    OperationHandlerCommand,
-    sharedImport
-} from "@mdeo/language-shared";
+import { BaseOperationHandler, GCompartment, OperationHandlerCommand, sharedImport } from "@mdeo/language-shared";
 import type { Command, GModelElement } from "@eclipse-glsp/server";
 import { AddHeaderDeclarationOperation, ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
 import { InsertNewLabelAction } from "@mdeo/protocol-common";
 import type { ModelTransformationType } from "../../../grammar/modelTransformationTypes.js";
-import { GHeaderRowLabel } from "../model/headerNode.js";
-import { headerInsertEdit, headerLineKind, NEW_HEADER_LABEL_PREFIX } from "../modelTransformationHeader.js";
+import { GDeclarationLabel } from "../model/declarationLabel.js";
+import {
+    declarationsCompartmentId,
+    headerInsertEdit,
+    headerLineKind,
+    NEW_DECLARATION_LABEL_PREFIX
+} from "../modelTransformationHeader.js";
 
 const { injectable } = sharedImport("inversify");
 
 /**
- * Handler adding a line to the header of a transformation — a path import or an `in` / `out`
- * declaration — when a new row of the header box is committed. The line goes where the
- * serializer puts it: imports after `using` and the other imports, declarations after the
- * imports, inputs before outputs.
+ * Handler adding a line to the header of a transformation — an `in` / `out` declaration (or a
+ * path import) — when a new row of the start node or of an end node is committed. The line goes
+ * where the serializer puts it: imports after `using` and the other imports, declarations after
+ * the imports, inputs before outputs.
  */
 @injectable()
 export class AddHeaderDeclarationOperationHandler extends BaseOperationHandler {
@@ -50,58 +49,51 @@ export class AddHeaderDeclarationOperationHandler extends BaseOperationHandler {
 }
 
 /**
- * Builds the action that adds a new, prefilled row to the header box and starts editing it;
- * committing the row adds the line through {@link AddHeaderDeclarationOperation}.
+ * Builds the action that adds a new, prefilled declaration row to a node and starts editing it:
+ * an input to the start node, an output to the primary successful end node. Committing the row
+ * adds the line through {@link AddHeaderDeclarationOperation}.
  *
- * An import row goes below the other imports, an input below the other inputs and an output
- * below all declarations, which is where the line will be inserted. A section that does not
- * exist yet is inserted together with its row.
+ * The row goes below the node's other rows; a node without rows gets its rows compartment with
+ * it (and so turns from its plain symbol into a box while the row is edited).
  *
- * @param header The header box
+ * @param node The start node (for an input) or the primary end node (for an output)
  * @param text The prefilled line, e.g. `in input1: int`
- * @returns The action, or undefined when the text is no header line
+ * @returns The action, or undefined when the text is no declaration
  */
-export function buildInsertHeaderLineAction(header: GModelElement, text: string): InsertNewLabelAction | undefined {
+export function buildInsertDeclarationAction(node: GModelElement, text: string): InsertNewLabelAction | undefined {
     const kind = headerLineKind(text);
-    if (kind == undefined) {
+    if (kind !== "in" && kind !== "out") {
         return undefined;
     }
-    const section = kind === "import" ? "imports" : "declarations";
-    const labelId = `${NEW_HEADER_LABEL_PREFIX}${section}`;
-    const builder = kind === "import" ? GHeaderRowLabel.importBuilder() : GHeaderRowLabel.declarationBuilder();
-    const label = builder
+    const labelId = `${NEW_DECLARATION_LABEL_PREFIX}${kind}`;
+    const label = GDeclarationLabel.builder()
         .id(labelId)
         .text(text)
         .isNewLabel(true)
         .newLabelOperationKind(AddHeaderDeclarationOperation.NEW_LABEL_KIND)
-        .newLabelParentElementId(header.id)
+        .newLabelParentElementId(node.id)
         .build();
 
-    const sectionId = `${header.id}__${section}`;
-    const existing = header.children.find((child) => child.id === sectionId);
+    const compartmentId = declarationsCompartmentId(node.id);
+    const existing = node.children.find((child) => child.id === compartmentId);
     if (existing != undefined) {
-        let insertIndex = existing.children.length;
-        if (kind === "in") {
-            const lastInput = existing.children.findLastIndex((row) =>
-                /^\s*in\b/.test((row as { text?: string }).text ?? "")
-            );
-            insertIndex = lastInput >= 0 ? lastInput + 1 : 0;
-        }
-        return InsertNewLabelAction.create({ parentElementId: sectionId, insertIndex, templates: [label], labelId });
+        return InsertNewLabelAction.create({
+            parentElementId: compartmentId,
+            insertIndex: existing.children.length,
+            templates: [label],
+            labelId
+        });
     }
 
-    const divider = GHorizontalDivider.builder()
-        .type(ModelTransformationElementType.DIVIDER)
-        .id(`${header.id}__${section}-divider`)
+    const compartment = GCompartment.builder()
+        .type(ModelTransformationElementType.COMPARTMENT)
+        .id(compartmentId)
         .build();
-    const compartment = GCompartment.builder().type(ModelTransformationElementType.COMPARTMENT).id(sectionId).build();
     compartment.children.push(label);
-    // the imports follow the title, the declarations come last
-    const insertIndex = kind === "import" ? 1 : header.children.length;
     return InsertNewLabelAction.create({
-        parentElementId: header.id,
-        insertIndex,
-        templates: [divider, compartment],
+        parentElementId: node.id,
+        insertIndex: node.children.length,
+        templates: [compartment],
         labelId
     });
 }
