@@ -487,27 +487,34 @@ Transformations have a diagram editor too. Pattern objects and links appear as n
 their modifier reflected in the styling, so the effect of a rule can be read at a glance. Element
 inputs, call outputs and loop variables appear as bound objects in the patterns that use them.
 
-The header is a box above the start node: the file's name, then one row per
-[import](#callable-transformations) and one per `in` / `out` declaration, written as in the source
-(`import "./sync/stores-of.mt" as storesOf`, `in maxCandidates: int = 0`). A file without
-declarations says *no inputs or outputs*. Double-click a row (or select it and press F2) to edit the
-line: a new name or alias is renamed wherever the file uses it — for an optional element input
-also the object of the first pattern it pins — and the type, default and path are replaced as
-typed; the editor refuses a line that does not parse or whose name is taken. Select a row and press
-Delete (or empty it) to remove the line. Deleting a declaration also deletes the pattern nodes that
-use it as an object (`placement { }`, `delete placement`) with their links, like deleting an
-instance; its other uses — in expressions, call arguments, scope blocks — stay and are reported by
-the validation, as are the calls of a deleted import. Errors and warnings of a line are shown on the
-box.
+The declarations are drawn where they take effect: the start node lists the `in` declarations and
+every successful end — the end after the last statement and each `stop` — lists the `out`
+declarations, one row each, written as in the source (`in maxCandidates: int = 0`,
+`out moved: Component`). A `kill` lists none, since it discards the result. Without inputs (or
+outputs) the node is the plain start dot (or end bullseye); with them it becomes a box with the
+symbol at the top and the rows below. Imports are not drawn; see them in the textual editor.
 
-The toolbox's **Declarations** group adds header lines. **Input**, **Output**, **Model Input** and
-**Model List Input** add a row with a fresh name — `in input1: int`, `out output1: int`,
-`in donor1: model`, `in donors1: List<model>` — and open it for editing with the name selected;
-Enter or clicking elsewhere keeps it, Escape discards it. The line goes where the textual editor's
-formatting puts it: inputs after the other inputs, outputs last, all after the imports.
-**Import…** opens a dialog to pick a `.mt` file of the project and, optionally, the alias, which
-defaults to the file name in camel case (`move-component.mt` becomes `moveComponent`), numbered when
-taken; the import goes after the other imports.
+Double-click a row (or select it and press F2) to edit the declaration: a new name is renamed
+wherever the file uses it — for an optional element input also the object of the first pattern it
+pins — and the type and default are replaced as typed; the editor refuses a line that does not
+parse, whose name is taken, or that turns an input into an output or back. The outputs shown at
+several ends are the same declarations, so editing a row at any end edits the single header line.
+Select a row and press Delete (or empty it) to remove the declaration. Deleting a declaration also
+deletes the pattern nodes that use it as an object (`placement { }`, `delete placement`) with their
+links, like deleting an instance; its other uses — in expressions, call arguments, scope blocks —
+stay and are reported by the validation. Errors and warnings of an input are shown on the start
+node, those of an output on the end after the last statement (or, without one, on the first
+`stop`).
+
+The toolbox's **Declarations** group adds header lines. **Input**, **Model Input** and **Model List
+Input** add a row with a fresh name — `in input1: int`, `in donor1: model`, `in donors1: List<model>`
+— to the start node, **Output** adds `out output1: int` to the end after the last statement (it is
+missing when the transformation never ends successfully), and each opens the row for editing with
+the name selected; Enter or clicking elsewhere keeps it, Escape discards it. The line goes where the
+textual editor's formatting puts it: inputs after the other inputs, outputs last, all after the
+imports. **Import…** opens a dialog to pick a `.mt` file of the project and, optionally, the alias,
+which defaults to the file name in camel case (`move-component.mt` becomes `moveComponent`),
+numbered when taken; the import goes after the other imports.
 
 The elements of a [scope block](#model-inputs) stay in the node of their pattern and are tagged with
 the model they belong to, `«in donor»`, the way the members of a `forbid` or `require` block are
