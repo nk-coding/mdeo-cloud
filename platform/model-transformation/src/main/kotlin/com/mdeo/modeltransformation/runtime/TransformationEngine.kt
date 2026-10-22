@@ -147,11 +147,164 @@ class TransformationEngine(
      *
      * This is the main entry point for running a transformation. It processes
      * all statements in the TypedAst sequentially, maintaining state throughout
-     * the execution.
+     * the execution. Every input takes its default (a transformation with a required input
+     * fails); see the overload for passing inputs.
      *
      * @return The result of the transformation execution.
      */
-    fun execute(): TransformationExecutionResult = run(emptyMap()).result
+    fun execute(): TransformationExecutionResult = execute(emptyMap())
+
+    /**
+     * Executes the transformation as a top-level run with inputs: values for scalar, enum and
+     * collection inputs (an operator's arguments from a configuration) and models for its model
+     * inputs (the donors of a crossover).
+     *
+     * [arguments] are bound exactly as the arguments of a `call`, at the root scope before the
+     * first statement; inputs not passed take their default, or null when optional. A value is a
+     * `String`, `Boolean`, number (converted to the input's `int`, `long`, `float` or `double`,
+     * where an `int`/`long` input takes integral numbers only), [EnumLiteral], or for a `List<T>`/
+     * `Set<T>` input any [Iterable] of those (a set keeps one of equal values).
+     *
+     * [models] are loaded into this engine's graph for the run, each into a model-input slot of
+     * its own ([ModelGraph.loadModelInput]), in the order of the declarations and of a list's
+     * models; the inputs are bound to their [ModelSlot]s. They are removed again when the run
+     * ends — by success, failure, `stop`, `kill` or an exception — so that afterwards the graph
+     * holds the changed implicit model alone, with no vertex, edge, name or statistic of the
+     * inputs ([ModelGraph.unloadModelInputs]). While they are loaded, every match filters the
+     * objects it scans for by model; without model inputs no such step is emitted.
+     *
+     * @param arguments Values of scalar, enum and collection inputs, by name.
+     * @param models The models of the model inputs, by name: a [ModelArgument.Single] for
+     *   `in x: model`, a [ModelArgument.Many] for `in xs: List<model>`. Every model input must be
+     *   passed (otherwise the run fails, as for any required input).
+     * @return The result of the transformation execution.
+     * @throws IllegalArgumentException When an argument names no input of the transformation,
+     *   names an element, model or output parameter, or does not fit the input's type; when a
+     *   model argument names no model input or has the wrong form.
+     * @throws IllegalStateException When model inputs are already loaded into the graph.
+     */
+    fun execute(
+        arguments: Map<String, Any?>,
+        models: Map<String, ModelArgument> = emptyMap()
+    ): TransformationExecutionResult {
+        val inputs = argumentBindings(arguments)
+        val modelArguments = modelArguments(models)
+        if (modelArguments.isEmpty()) {
+            return run(inputs).result
+        }
+        check(modelGraph.modelInputSlots.isEmpty()) {
+            "The graph already holds model inputs ${modelGraph.modelInputSlots}; runs with model inputs do not nest"
+        }
+        try {
+            return run(inputs + loadModelInputs(modelArguments)).result
+        } finally {
+            modelGraph.unloadModelInputs()
+        }
+    }
+
+    /**
+     * Checks [arguments] against the signature and converts them to the bindings a call would
+     * pass: numbers to the input's type, enum literals to their runtime value, collections to a
+     * [CollectionValue] of the input's kind.
+     */
+    private fun argumentBindings(arguments: Map<String, Any?>): Map<String, VariableBinding> {
+        if (arguments.isEmpty()) return emptyMap()
+        return arguments.mapValues { (name, value) ->
+            val parameter = inputParameter(name)
+            require(!parameter.isElement && !parameter.elementsAreElements && !parameter.isModel) {
+                "Input '$name' of '${displayName}' takes model elements or models; it cannot be passed a value"
+            }
+            val type = getTypeOrNull(parameter.type) as? ClassTypeRef
+            val converted = when {
+                value == null -> null
+                parameter.isCollection -> {
+                    require(value is Iterable<*>) { "Input '$name' of '$displayName' is a collection, not $value" }
+                    val elementType = type?.typeArgs?.values?.firstOrNull() as? ClassTypeRef
+                    CollectionValue(parameter.collection == "Set", value.map { argumentValue(name, it, elementType) })
+                }
+                else -> argumentValue(name, value, type)
+            }
+            VariableBinding.ValueBinding(converted)
+        }
+    }
+
+    /**
+     * Converts the value of an argument (or of one element of a collection argument) to the
+     * runtime value of [type].
+     */
+    private fun argumentValue(name: String, value: Any?, type: ClassTypeRef?): Any? {
+        if (value == null || type == null) {
+            return (value as? EnumLiteral)?.runtimeValue ?: value
+        }
+        fun mismatch(): Nothing =
+            throw IllegalArgumentException("Input '$name' of '$displayName' is of type ${type.type}, not $value")
+        if (type.`package`.startsWith("enum")) {
+            return when (value) {
+                is EnumLiteral -> if (value.enumName == type.type) value.runtimeValue else mismatch()
+                is String -> value
+                else -> mismatch()
+            }
+        }
+        if (type.`package` != "builtin") {
+            return value
+        }
+        return when (type.type) {
+            "int", "long" -> if (value is Int || value is Long || value is Short || value is Byte) {
+                if (type.type == "int") (value as Number).toInt() else (value as Number).toLong()
+            } else {
+                mismatch()
+            }
+            "float" -> (value as? Number)?.toFloat() ?: mismatch()
+            "double" -> (value as? Number)?.toDouble() ?: mismatch()
+            "string" -> value as? String ?: mismatch()
+            "boolean" -> value as? Boolean ?: mismatch()
+            else -> value
+        }
+    }
+
+    /**
+     * The input parameter [name] of the signature.
+     *
+     * @throws IllegalArgumentException When the transformation has no such input.
+     */
+    private fun inputParameter(name: String): TypedTransformationParameter =
+        ast.signature?.parameters?.firstOrNull { it.isInput && it.name == name }
+            ?: throw IllegalArgumentException("'$displayName' has no input '$name'")
+
+    /** The transformation's name for messages: its file's base name, if known. */
+    private val displayName: String get() = ast.signature?.name ?: "transformation"
+
+    /**
+     * Checks [models] against the model inputs of the signature and orders them by declaration.
+     */
+    private fun modelArguments(models: Map<String, ModelArgument>): List<Pair<TypedTransformationParameter, ModelArgument>> {
+        if (models.isEmpty()) return emptyList()
+        for ((name, argument) in models) {
+            val parameter = inputParameter(name)
+            require(parameter.isModel) { "Input '$name' of '$displayName' is not a model input" }
+            require((argument is ModelArgument.Many) == parameter.isCollection) {
+                "Input '$name' of '$displayName' takes " + if (parameter.isCollection) "a list of models" else "one model"
+            }
+        }
+        return ast.signature!!.parameters.mapNotNull { parameter -> models[parameter.name]?.let { parameter to it } }
+    }
+
+    /**
+     * Loads the models of [arguments] into slots 1, 2, … of the graph and returns the bindings of
+     * their inputs: a [ModelSlot], or a list of them.
+     */
+    private fun loadModelInputs(
+        arguments: List<Pair<TypedTransformationParameter, ModelArgument>>
+    ): Map<String, VariableBinding> {
+        var nextSlot = ModelGraph.IMPLICIT_MODEL_SLOT + 1
+        return arguments.associate { (parameter, argument) ->
+            val slots = argument.models.map { model ->
+                ModelSlot(nextSlot++).also { modelGraph.loadModelInput(it.slot, model) }
+            }
+            val value: Any = if (parameter.isCollection) CollectionValue(false, slots) else slots.single()
+            parameter.name to VariableBinding.ValueBinding(value)
+        }
+    }
 
     /**
      * Runs this engine's transformation as a callee: with its inputs bound, and with `stop`

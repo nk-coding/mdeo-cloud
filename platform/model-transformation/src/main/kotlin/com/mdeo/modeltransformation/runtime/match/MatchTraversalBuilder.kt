@@ -21,11 +21,19 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.`__` as Anonymou
  * applied sequentially to build an efficient traversal with early constraint pruning.
  *
  * Post-match filters are handled by the caller ([MatchExecutor]).
+ *
+ * While model inputs are loaded ([models] not null), the scan of every pattern object is filtered
+ * by the object's model slot ([com.mdeo.modeltransformation.graph.ModelGraph.filterModelSlot]),
+ * right after its class filter; without model inputs no such step is emitted, and the traversal is
+ * exactly the one without the feature.
+ *
+ * @param models The model slots of the pattern's objects, or null when no model input is loaded.
  */
 internal class MatchTraversalBuilder(
     private val expressionSupport: ExpressionSupport,
     private val compilationContext: CompilationContext,
-    private val engine: TransformationEngine
+    private val engine: TransformationEngine,
+    private val models: PatternModels? = null
 ) {
     private val anchorLabel = MATCH_ANCHOR_LABEL
 
@@ -84,7 +92,21 @@ internal class MatchTraversalBuilder(
                 "VertexScan for '${step.instanceName}' has neither vertexId nor className"
             )
         }
-        return scanned.`as`(VariableBinding.stepLabel(step.instanceName)) as GraphTraversal<Vertex, Vertex>
+        return scanned.applyModelFilter(step.instanceName)
+            .`as`(VariableBinding.stepLabel(step.instanceName)) as GraphTraversal<Vertex, Vertex>
+    }
+
+    /**
+     * Keeps only the vertices of the model of the pattern object [instanceName], while model
+     * inputs are loaded; otherwise returns the traversal unchanged. A name that is no object of
+     * the pattern (a bound object an expression reads) is not filtered.
+     *
+     * @param instanceName The scanned object.
+     * @return The traversal, filtered by model when needed.
+     */
+    private fun <S, E> GraphTraversal<S, E>.applyModelFilter(instanceName: String): GraphTraversal<S, E> {
+        val slot = models?.slotOf(instanceName) ?: return this
+        return engine.modelGraph.filterModelSlot(this, slot)
     }
 
     /**
@@ -243,7 +265,7 @@ internal class MatchTraversalBuilder(
     private fun conditionBuilder(step: BaseStep.ApplicationCondition): MatchTraversalBuilder {
         if (step.localNames.isEmpty()) return this
         val scope = compilationContext.currentScope.conditionScope(step.localNames)
-        return MatchTraversalBuilder(expressionSupport.withScope(scope), compilationContext.withScope(scope), engine)
+        return MatchTraversalBuilder(expressionSupport.withScope(scope), compilationContext.withScope(scope), engine, models)
     }
 
     /**
@@ -290,7 +312,7 @@ internal class MatchTraversalBuilder(
                         else -> throw IllegalStateException(
                             "VertexScan for '${step.instanceName}' has neither vertexId nor className"
                         )
-                    }
+                    }.applyModelFilter(step.instanceName)
                     val nodeLabel = VariableBinding.stepLabel(step.instanceName)
                     val labeled = if (nodeLabel in neededLabels) {
                         v.`as`(nodeLabel) as GraphTraversal<Any, Any>

@@ -12,7 +12,9 @@ import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
  * Executor for [TypedCallStatement]: runs another transformation on the same model graph.
  *
  * 1. The arguments are evaluated in the caller's context; an argument naming a bound object
- *    passes that object.
+ *    passes that object, and one naming a model value (a model input or a loop variable over a
+ *    list of them) passes its [com.mdeo.modeltransformation.runtime.ModelSlot] — the model the
+ *    caller's run already loaded, by reference.
  * 2. The callee runs as an engine of its own (its own types and root scope, the caller's graph
  *    and type registry) with its inputs bound, so its patterns treat element inputs as bound
  *    nodes.

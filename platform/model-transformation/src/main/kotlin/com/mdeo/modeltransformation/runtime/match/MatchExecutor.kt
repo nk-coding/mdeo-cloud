@@ -77,12 +77,13 @@ class MatchExecutor {
         if (!engine.deterministic) { engine.modelGraph.resetNondeterminism() }
 
         val elements = withReferenceClasses(PatternCategories.from(pattern), context, engine)
+        val models = PatternModels.of(elements, context, engine.modelGraph)
         for (name in elements.allInstanceNames) {
             if (context.variableScope.getVariable(name) == null) {
                 context.variableScope.setBinding(name, VariableBinding.InstanceBinding(vertexRef = null))
             }
         }
-        return executeUnifiedTraversal(elements, context, engine, limit)
+        return executeUnifiedTraversal(elements, context, engine, limit, models)
     }
 
     /**
@@ -138,13 +139,15 @@ class MatchExecutor {
      * @param context The current transformation execution context.
      * @param engine The transformation engine providing graph access and type information.
      * @param limit Maximum number of results (-1 for unlimited).
+     * @param models The models of the pattern's objects while model inputs are loaded, else null.
      * @return List of matched results (may be empty).
      */
     private fun executeUnifiedTraversal(
         allElements: PatternCategories,
         context: TransformationExecutionContext,
         engine: TransformationEngine,
-        limit: Long
+        limit: Long,
+        models: PatternModels?
     ): List<MatchResult.Matched> {
         val expressionSupport = ExpressionSupport(engine, context, labelIdGenerator)
         val compilationContext = expressionSupport.newCompilationContext()
@@ -211,7 +214,7 @@ class MatchExecutor {
 
         val traversal = buildUnifiedTraversal(
             elements, matchPlan,
-            expressionSupport, compilationContext, limit, deferred, allElements
+            expressionSupport, compilationContext, limit, models, deferred, allElements
         )
 
         val planBoundNames = matchPlan.baseSteps.mapNotNull { step ->
@@ -312,6 +315,7 @@ class MatchExecutor {
      * @param expressionSupport Shared expression compilation utilities.
      * @param compilationContext The compilation context for unique label generation.
      * @param limit Maximum number of results (-1 for unlimited).
+     * @param models The models of the pattern's objects while model inputs are loaded, else null.
      * @return The fully assembled traversal ready for execution.
      */
     @Suppress("UNCHECKED_CAST")
@@ -321,10 +325,11 @@ class MatchExecutor {
         expressionSupport: ExpressionSupport,
         compilationContext: com.mdeo.modeltransformation.compiler.CompilationContext,
         limit: Long,
+        models: PatternModels?,
         deferred: DeferredBindings = DeferredBindings.NONE,
         allElements: PatternCategories = elements
     ): GraphTraversal<Vertex, Any> {
-        val traversalBuilder = MatchTraversalBuilder(expressionSupport, compilationContext, expressionSupport.engine)
+        val traversalBuilder = MatchTraversalBuilder(expressionSupport, compilationContext, expressionSupport.engine, models)
         var t: GraphTraversal<Vertex, Map<String, Any>> =
             traversalBuilder.buildBaseTraversal(plan) as GraphTraversal<Vertex, Map<String, Any>>
 
