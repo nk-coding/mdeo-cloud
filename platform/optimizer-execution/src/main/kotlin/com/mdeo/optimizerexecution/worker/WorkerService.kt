@@ -175,7 +175,9 @@ class WorkerService(
             scriptTimeoutMs = effectiveScriptTimeoutMs,
             transformationTimeoutMs = effectiveTransformationTimeoutMs,
             workerThreads = effectiveThreads,
-            graphBackendType = request.graphBackendType
+            graphBackendType = request.graphBackendType,
+            mutationOperators = request.mutationOperators,
+            crossoverOperators = request.crossoverOperators
         )
 
         val setupResult = withContext(dispatcher) {

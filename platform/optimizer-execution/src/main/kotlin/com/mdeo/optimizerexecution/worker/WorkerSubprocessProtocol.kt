@@ -5,6 +5,7 @@ import com.mdeo.metamodel.data.MetamodelData
 import com.mdeo.metamodel.data.ModelData
 import com.mdeo.optimizer.config.GoalConfig
 import com.mdeo.optimizer.config.GraphBackendType
+import com.mdeo.optimizer.config.OperatorRef
 import com.mdeo.optimizer.config.SolverConfig
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -53,6 +54,10 @@ sealed class WorkerSubprocessRequest {
      * @param transformationTimeoutMs Per-transformation execution timeout in milliseconds. Used for internal watchdog timing.
      * @param workerThreads Number of threads to use for parallel mutation within this subprocess.
      *        When greater than 1, tasks in a [NodeWorkBatchRequest] are evaluated in parallel.
+     * @param mutationOperators The mutation operators and their arguments
+     *        ([com.mdeo.optimizer.worker.WorkerAllocationRequest.mutationOperators]).
+     * @param crossoverOperators The crossover operators and their arguments
+     *        ([com.mdeo.optimizer.worker.WorkerAllocationRequest.crossoverOperators]).
      */
     @Serializable
     @SerialName("setup")
@@ -72,7 +77,9 @@ sealed class WorkerSubprocessRequest {
         val scriptTimeoutMs: Long = 0L,
         val transformationTimeoutMs: Long = 0L,
         val workerThreads: Int = 1,
-        val graphBackendType: GraphBackendType = GraphBackendType.MDEO
+        val graphBackendType: GraphBackendType = GraphBackendType.MDEO,
+        val mutationOperators: List<OperatorRef> = emptyList(),
+        val crossoverOperators: List<OperatorRef> = emptyList()
     ) : WorkerSubprocessRequest()
 
     /**
