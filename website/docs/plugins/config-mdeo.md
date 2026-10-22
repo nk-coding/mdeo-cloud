@@ -324,7 +324,7 @@ In the results, `summary.md` lists the mutation and the crossover operators sepa
 arguments, and plots per generation how many children crossed over successfully and how many fell
 back to a copy, and how often each crossover operator applied. `report.json` holds the same under
 `operators.crossovers` and, per generation, `crossover { attempted, succeeded, fellBack, perOperator }`,
-counted per child.
+counted per child; `perOperator` is keyed by the operator's id in `operators.crossovers`.
 
 #### `termination`
 

@@ -1221,7 +1221,9 @@ class OptimizerExecutionService(
                     xTitle = "Generation",
                     yTitle = "Children",
                     traces = operators.crossovers.mapIndexed { id, ref ->
-                        PlotTrace(jsonText(ref.label), xs, generations.map { it.crossover.perOperator[id] ?: 0 })
+                        // two entries of one file with the same arguments share a label; the id tells them apart
+                        val name = if (operators.crossovers.count { it.label == ref.label } > 1) "${ref.label} #$id" else ref.label
+                        PlotTrace(jsonText(name), xs, generations.map { it.crossover.perOperator[id] ?: 0 })
                     },
                     stackedBars = true
                 ))
@@ -1336,10 +1338,10 @@ class OptimizerExecutionService(
                                     put("attempted", gen.crossover.attempted)
                                     put("succeeded", gen.crossover.succeeded)
                                     put("fellBack", gen.crossover.fellBack)
+                                    // keyed by crossover operator id (see "operators.crossovers" for the labels):
+                                    // labels are not unique when one file is listed twice with the same arguments
                                     putJsonObject("perOperator") {
-                                        gen.crossover.perOperator.forEach { (id, count) ->
-                                            put(operators.crossovers.getOrNull(id)?.label ?: "crossover $id", count)
-                                        }
+                                        gen.crossover.perOperator.forEach { (id, count) -> put(id.toString(), count) }
                                     }
                                 }
                             }
