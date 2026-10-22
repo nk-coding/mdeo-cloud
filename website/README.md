@@ -67,4 +67,4 @@ When a language gains a keyword, add it there too.
 ## Deployment
 
 `.github/workflows/docs.yml` builds the site on every push to `main` that touches `website/` or
-`app/packages/`, and publishes it to GitHub Pages. The `base` in `config.ts` is `/mdeo-cloud/`.
+`app/packages/`, and publishes it to GitHub Pages. The `base` in `config.ts` defaults to `/mdeo-cloud/`; the workflow sets it (and the repository link) from the repository it runs in, `/<repository name>/`.

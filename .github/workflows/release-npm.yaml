@@ -23,6 +23,9 @@ permissions:
 jobs:
   publish:
     name: Publish to npm
+    # Disabled for now: this copy (nk-coding/mdeo-cloud-private) only publishes the container images
+    # (docker-publish.yml). Remove the condition to publish the npm packages again.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
