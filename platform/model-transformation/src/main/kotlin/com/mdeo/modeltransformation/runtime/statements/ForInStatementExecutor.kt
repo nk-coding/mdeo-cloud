@@ -15,7 +15,8 @@ import com.mdeo.modeltransformation.runtime.TransformationExecutionResult
  *
  * The collection is evaluated once, before the first iteration, so additions to it in the body
  * do not change the iterations. The loop enters one scope level, where the loop variable is
- * bound to each element in turn (a model element as a bound object, a scalar as a value); the do
+ * bound to each element in turn (a model element as a bound object, a scalar or a model of a
+ * `List<model>` input — its [com.mdeo.modeltransformation.runtime.ModelSlot] — as a value); the do
  * block enters another. An empty collection runs no iteration and succeeds. A failure or a stop
  * in an iteration ends the loop with it, as in `for match`.
  */
