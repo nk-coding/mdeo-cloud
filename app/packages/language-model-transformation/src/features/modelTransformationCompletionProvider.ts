@@ -8,6 +8,7 @@ import {
     CallArgument,
     CallOutput,
     MetamodelFileImport,
+    TransformationFileImport,
     type TransformationParameterType
 } from "../grammar/modelTransformationTypes.js";
 
@@ -17,7 +18,8 @@ const { AstUtils } = sharedImport("langium");
  * Completion provider for the Model Transformation language.
  *
  * Extends expression completion with relative path completions for the metamodel
- * file path in `using "..."` statements, and offers only the callee's `in` parameters as the
+ * file path in `using "..."` statements and the transformation path of `import "..." as name`,
+ * and offers only the callee's `in` parameters as the
  * arguments of a call and only its `out` parameters after `->`.
  */
 export class ModelTransformationCompletionProvider extends ExpressionCompletionProvider {
@@ -84,13 +86,21 @@ export class ModelTransformationCompletionProvider extends ExpressionCompletionP
             return;
         }
 
-        if (!this.reflection.isInstance(node, MetamodelFileImport) || next.property !== "file") {
+        if (next.property !== "file") {
+            return;
+        }
+        const extensions = this.reflection.isInstance(node, MetamodelFileImport)
+            ? [".mm"]
+            : this.reflection.isInstance(node, TransformationFileImport)
+              ? [".mt"]
+              : undefined;
+        if (extensions == undefined) {
             return;
         }
 
         try {
             const document = AstUtils.getDocument(node);
-            const paths = computeRelativePathCompletions(document, this.documents, [".mm"]);
+            const paths = computeRelativePathCompletions(document, this.documents, extensions);
             acceptRelativePathCompletions(context, acceptor, paths);
         } catch {
             // Ignore errors during completion

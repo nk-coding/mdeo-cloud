@@ -283,7 +283,7 @@ export class ModelTransformationPartialTypeSystem extends PartialTypeSystem<
     }
 
     /**
-     * Registers the rules for the parameters of a signature: a parameter has its declared type,
+     * Registers the rules for the header parameters: a parameter has its declared type,
      * and a default value must be assignable to it.
      */
     private registerTransformationParameterRules(): void {

@@ -8,6 +8,7 @@ import {
     sharedImport
 } from "@mdeo/language-shared";
 import {
+    getCallee,
     AssignmentStatement,
     CallOutput,
     CallStatement,
@@ -45,13 +46,14 @@ import {
     type StopStatementType,
     type TransformationFileImportType,
     type TransformationParameterType,
-    type TransformationSignatureType,
     type UntilMatchStatementType,
     type WhileExpressionStatementType,
     type WhileMatchStatementType
 } from "../grammar/modelTransformationTypes.js";
 import {
     TransformationDeclarationResolver,
+    flattenModelScopes,
+    getModelShape,
     parameterTypeName,
     requiredInputs,
     type TypeInference
@@ -73,16 +75,18 @@ function isSubclassOf(subclass: ClassType, superclass: ClassType, reflection: As
 }
 
 /**
- * Validates callable transformations: signatures, imports of other transformations, calls and
- * the references of patterns to parameters and call outputs.
+ * Validates callable transformations: header declarations, path imports of other
+ * transformations, calls and the references of patterns to parameters and call outputs.
  *
  * The rules:
  * - a parameter is a single model element (a metamodel class), a scalar (`int`, `long`,
  *   `float`, `double`, `string`, `boolean`, an enum) or a `List<T>` / `Set<T>` of either; an
  *   element input has no default, and it is nullable only when it pins an object of the first
- *   pattern (it is then optional: absent or null, the object is matched freely);
- * - an imported file must be a transformation with a signature, whose metamodel is this file's
- *   metamodel or one this file's metamodel imports; imports must not form a cycle;
+ *   pattern (it is then optional: absent or null, the object is matched freely); an `in`
+ *   parameter may also be a `model` or a `List<model>` (no default, not nullable);
+ * - an imported file must be a model transformation (every `.mt` file is one), whose metamodel
+ *   is this file's metamodel or one this file's metamodel imports; imports must not form a
+ *   cycle; importing a file twice is a warning;
  * - a call names each input at most once, passes every required input and binds only outputs;
  * - a non-nullable output is assigned on every path on which the transformation succeeds
  *   (collection outputs start empty and need no assignment);
@@ -113,15 +117,15 @@ export class TransformationCallValidator {
      */
     validateIfCall(ifCall: IfCallStatementType, accept: ValidationAcceptor): void {
         const call = ifCall.ifBlock?.call;
-        const signature = call?.callee?.ref;
-        if (call == undefined || signature == undefined) {
+        const callee = getCallee(call);
+        if (call == undefined || callee == undefined) {
             return;
         }
-        const violation = this.safety.findUnsafeFailure(signature);
+        const violation = this.safety.findUnsafeFailure(callee);
         if (violation != undefined) {
             accept(
                 "error",
-                `'if call' needs a transformation that fails before it changes the model, but '${signature.name}' ${violation}. The engine does not undo changes, so the else block would run on a changed model. Use a plain 'call', or move every match that can fail before the first change.`,
+                `'if call' needs a transformation that fails before it changes the model, but '${call.callee?.$refText}' ${violation}. The engine does not undo changes, so the else block would run on a changed model. Use a plain 'call', or move every match that can fail before the first change.`,
                 { node: call, property: "callee" }
             );
         }
@@ -168,33 +172,63 @@ export class TransformationCallValidator {
     }
 
     /**
-     * Validates the signature, the imports and the definite assignment of the outputs.
+     * Validates the header declarations, the imports and the definite assignment of the outputs.
      *
      * @param transformation The transformation root
      * @param accept The validation acceptor
      */
     validateTransformation(transformation: ModelTransformationType, accept: ValidationAcceptor): void {
-        if (transformation.signature != undefined) {
-            this.validateSignature(transformation.signature, accept);
-            this.validateOutputsAssigned(transformation, transformation.signature, accept);
-        }
+        this.validateDeclarations(transformation, accept);
+        this.validateOutputsAssigned(transformation, accept);
+        const imported = new Map<string, TransformationFileImportType>();
         for (const fileImport of transformation.imports ?? []) {
             this.validateImport(transformation, fileImport, accept);
+            this.validateNotImportedTwice(transformation, fileImport, imported, accept);
         }
     }
 
     /**
-     * Validates a call: its arguments and outputs against the callee's signature.
+     * Warns about a file that is imported a second time (under another alias): both aliases
+     * name the same transformation.
+     *
+     * @param transformation The importing transformation
+     * @param fileImport The import
+     * @param imported The imports seen so far, by the resolved path of their file
+     * @param accept The validation acceptor
+     */
+    private validateNotImportedTwice(
+        transformation: ModelTransformationType,
+        fileImport: TransformationFileImportType,
+        imported: Map<string, TransformationFileImportType>,
+        accept: ValidationAcceptor
+    ): void {
+        if (fileImport.file == undefined || fileImport.file.trim() === "") {
+            return;
+        }
+        const key = resolveRelativePath(AstUtils.getDocument(transformation), fileImport.file).toString();
+        const first = imported.get(key);
+        if (first == undefined) {
+            imported.set(key, fileImport);
+            return;
+        }
+        accept("warning", `'${fileImport.file}' is imported already (as '${first.name}'); one import is enough.`, {
+            node: fileImport,
+            property: "file"
+        });
+    }
+
+    /**
+     * Validates a call: its arguments and outputs against the callee's declarations.
      *
      * @param call The call statement
      * @param accept The validation acceptor
      */
     validateCall(call: CallStatementType, accept: ValidationAcceptor): void {
-        const signature = call.callee?.ref;
-        if (signature == undefined) {
+        const callee = getCallee(call);
+        if (callee == undefined) {
             return;
         }
-        const calleeName = signature.name;
+        const calleeName = call.callee?.$refText ?? "?";
 
         const passed = new Set<string>();
         for (const argument of call.arguments ?? []) {
@@ -219,7 +253,7 @@ export class TransformationCallValidator {
             passed.add(parameter.name);
         }
 
-        const missing = requiredInputs(signature).filter((p) => !passed.has(p.name));
+        const missing = requiredInputs(callee).filter((p) => !passed.has(p.name));
         if (missing.length > 0) {
             const names = missing.map((p) => `'${p.name}'`).join(", ");
             accept("error", `Missing required input${missing.length > 1 ? "s" : ""} ${names} of '${calleeName}'.`, {
@@ -288,7 +322,13 @@ export class TransformationCallValidator {
     ): boolean {
         if (this.reflection.isInstance(declaration, ForInVariable)) {
             const variable = declaration as ForInVariableType;
-            if (!this.declarations.isElementLoopVariable(variable)) {
+            if (this.declarations.isModelLoopVariable(variable)) {
+                accept(
+                    "error",
+                    `'${variable.name}' is a model, not a model element, so it cannot be a node of a pattern. Match objects of it in a scope block 'in ${variable.name} { … }'.`,
+                    { node: referenceNode, property }
+                );
+            } else if (!this.declarations.isElementLoopVariable(variable)) {
                 accept(
                     "error",
                     `'${variable.name}' runs over a collection of scalars (or of an unknown type), so it cannot be a node of a pattern. Use it in expressions instead.`,
@@ -310,6 +350,16 @@ export class TransformationCallValidator {
             return true;
         }
         const kind = this.declarations.getParameterKind(parameter);
+        if (kind === "model") {
+            accept(
+                "error",
+                getModelShape(this.reflection, parameter) === "list"
+                    ? `'${name}' is a list of models, not a model element, so it cannot be a node of a pattern. Loop over it with 'for m in ${name} do { … }' and match in a scope block 'in m { … }'.`
+                    : `'${name}' is a model, not a model element, so it cannot be a node of a pattern. Match objects of it in a scope block 'in ${name} { … }'.`,
+                { node: referenceNode, property }
+            );
+            return true;
+        }
         if (kind === "collection") {
             accept(
                 "error",
@@ -352,21 +402,35 @@ export class TransformationCallValidator {
     }
 
     /**
-     * Validates the parameters of a signature.
+     * Validates the header declarations (`in …` / `out …`).
      *
-     * @param signature The signature
+     * @param transformation The transformation root
      * @param accept The validation acceptor
      */
-    private validateSignature(signature: TransformationSignatureType, accept: ValidationAcceptor): void {
-        for (const parameter of signature.parameters ?? []) {
+    private validateDeclarations(transformation: ModelTransformationType, accept: ValidationAcceptor): void {
+        for (const parameter of transformation.parameters ?? []) {
             const kind = this.declarations.getParameterKind(parameter);
             const typeName = parameterTypeName(this.reflection, parameter);
+            if (kind === "model") {
+                this.validateModelParameter(parameter, accept);
+                continue;
+            }
+            if (this.mentionsModelType(typeName)) {
+                accept(
+                    "error",
+                    typeName?.name === "Set"
+                        ? `'${parameter.name}' cannot be a Set<model>; several input models are passed as 'List<model>'.`
+                        : `The type 'model' can only be written as 'in ${parameter.name}: model' or 'in ${parameter.name}: List<model>'.`,
+                    { node: parameter, property: "type" }
+                );
+                continue;
+            }
             if (kind === "unsupported") {
                 accept(
                     "error",
                     typeName?.hasTypeArgs === true
                         ? `The type of '${parameter.name}' must be List<T> or Set<T> of a class or enum of the metamodel or of int, long, float, double, string or boolean, not nullable and not nested.`
-                        : `The type of '${parameter.name}' must be a class or enum of the metamodel, one of int, long, float, double, string and boolean, or a List<…> or Set<…> of those.`,
+                        : `The type of '${parameter.name}' must be a class or enum of the metamodel, one of int, long, float, double, string and boolean, a List<…> or Set<…> of those, or (for an input) model or List<model>.`,
                     { node: parameter, property: "type" }
                 );
                 continue;
@@ -397,6 +461,49 @@ export class TransformationCallValidator {
                 }
             }
         }
+    }
+
+    /**
+     * Validates a parameter typed with `model`: only `in x: model` and `in xs: List<model>`
+     * exist; a model input is never optional (no `?`, no default), and a transformation has no
+     * model outputs (only its implicit model is changed).
+     *
+     * @param parameter The parameter
+     * @param accept The validation acceptor
+     */
+    private validateModelParameter(parameter: TransformationParameterType, accept: ValidationAcceptor): void {
+        const typeName = parameterTypeName(this.reflection, parameter);
+        if (parameter.direction === "out") {
+            accept(
+                "error",
+                `A transformation has no model outputs: '${parameter.name}' cannot be 'out … : ${typeName?.hasTypeArgs ? "List<model>" : "model"}'. Only the model the transformation runs on is changed.`,
+                { node: parameter, property: "direction" }
+            );
+            return;
+        }
+        if (typeName?.isNullable === true || typeName?.typeArgs[0]?.isNullable === true) {
+            accept(
+                "error",
+                `A model input cannot be nullable: '${parameter.name}' must be passed (write '${typeName?.hasTypeArgs ? "List<model>" : "model"}').`,
+                { node: parameter, property: "type" }
+            );
+        }
+        if (parameter.defaultValue != undefined) {
+            accept("error", `The model input '${parameter.name}' cannot have a default value.`, {
+                node: parameter,
+                property: "defaultValue"
+            });
+        }
+    }
+
+    /**
+     * Whether a written type mentions `model` anywhere.
+     */
+    private mentionsModelType(typeName: ReturnType<typeof parameterTypeName>): boolean {
+        if (typeName == undefined) {
+            return false;
+        }
+        return typeName.name === "model" || typeName.typeArgs.some((arg) => this.mentionsModelType(arg));
     }
 
     /**
@@ -514,7 +621,11 @@ export class TransformationCallValidator {
             return;
         }
         const targetRoot = target.parseResult?.value;
-        if (targetRoot == undefined || !this.reflection.isInstance(targetRoot, ModelTransformation)) {
+        if (
+            !file.endsWith(".mt") ||
+            targetRoot == undefined ||
+            !this.reflection.isInstance(targetRoot, ModelTransformation)
+        ) {
             accept("error", `The path '${file}' does not point to a model transformation file.`, {
                 node: fileImport,
                 property: "file"
@@ -522,26 +633,6 @@ export class TransformationCallValidator {
             return;
         }
         const callee = targetRoot as ModelTransformationType;
-        if (callee.signature == undefined) {
-            accept("error", `'${file}' declares no signature ('transformation name(…)'), so it cannot be called.`, {
-                node: fileImport,
-                property: "file"
-            });
-        } else {
-            for (const entityImport of fileImport.imports ?? []) {
-                const name = entityImport.entity?.$refText;
-                if (entityImport.entity?.ref == undefined && name != undefined && name !== callee.signature.name) {
-                    accept(
-                        "error",
-                        `'${file}' declares the transformation '${callee.signature.name}', not '${name}'.`,
-                        {
-                            node: entityImport,
-                            property: "entity"
-                        }
-                    );
-                }
-            }
-        }
 
         if (UriUtils.equals(target.uri, document.uri)) {
             accept("error", `A transformation cannot import itself; recursive calls are not supported.`, {
@@ -636,20 +727,16 @@ export class TransformationCallValidator {
      * a failing match is not a successful path.
      *
      * @param transformation The transformation root
-     * @param signature The signature
      * @param accept The validation acceptor
      */
-    private validateOutputsAssigned(
-        transformation: ModelTransformationType,
-        signature: TransformationSignatureType,
-        accept: ValidationAcceptor
-    ): void {
-        const required = (signature.parameters ?? []).filter(
+    private validateOutputsAssigned(transformation: ModelTransformationType, accept: ValidationAcceptor): void {
+        const required = (transformation.parameters ?? []).filter(
             (p) =>
                 p.direction === "out" &&
                 parameterTypeName(this.reflection, p)?.isNullable !== true &&
                 this.declarations.getParameterKind(p) !== "unsupported" &&
-                this.declarations.getParameterKind(p) !== "collection"
+                this.declarations.getParameterKind(p) !== "collection" &&
+                this.declarations.getParameterKind(p) !== "model"
         );
         if (required.length === 0) {
             return;
@@ -795,7 +882,7 @@ export class TransformationCallValidator {
      */
     private withPatternAssignments(assigned: Set<string>, pattern: PatternType | undefined): Set<string> {
         const result = new Set(assigned);
-        for (const element of pattern?.elements ?? []) {
+        for (const element of flattenModelScopes(this.reflection, pattern?.elements ?? [])) {
             if (this.reflection.isInstance(element, PatternVariableReassignment)) {
                 const target = (element as PatternVariableReassignmentType).variable?.ref;
                 if (this.reflection.isInstance(target, TransformationParameter)) {

@@ -52,7 +52,7 @@ import {
     type TransformationParameterType
 } from "../../grammar/modelTransformationTypes.js";
 import { ModelTransformationLambdaScope } from "./modelTransformationLambdaScope.js";
-import { TransformationDeclarationResolver } from "../transformationDeclarations.js";
+import { TransformationDeclarationResolver, flattenModelScopes } from "../transformationDeclarations.js";
 
 /**
  * Type definition for scope creator functions.
@@ -164,7 +164,7 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
 
     /**
      * Creates a scope for the root ModelTransformation node.
-     * This scope contains the parameters of the signature, all top-level pattern matches and
+     * This scope contains the header parameters, all top-level pattern matches and
      * their variables, and the outputs of top-level calls.
      *
      * @param node The ModelTransformation node.
@@ -182,7 +182,7 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
             this.reflection,
             this.typir.langium.LangiumServices.workspace.LangiumDocuments
         );
-        const parameters = (node.signature?.parameters ?? []).filter(
+        const parameters = (node.parameters ?? []).filter(
             (parameter) => declarations.getPinnedObject(parameter) == undefined
         );
         return new DefaultScope<TypirLangiumSpecifics>(
@@ -489,15 +489,13 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
         node: PatternApplicationConditionType,
         parentScope: BoundScope<TypirLangiumSpecifics> | undefined
     ): Scope<TypirLangiumSpecifics> {
+        const instances = flattenModelScopes(this.reflection, node.elements ?? []).filter((element) =>
+            this.reflection.isInstance(element, PatternObjectInstance)
+        ) as PatternObjectInstanceType[];
         return new DefaultScope<TypirLangiumSpecifics>(
             parentScope,
-            (scope) =>
-                (node.elements ?? [])
-                    .filter((element) => this.reflection.isInstance(element, PatternObjectInstance))
-                    .map((element) => this.createObjectInstanceEntry(element as PatternObjectInstanceType, -1, scope)),
-            (node.elements ?? [])
-                .filter((element) => this.reflection.isInstance(element, PatternObjectInstance))
-                .map((element) => ({ name: (element as PatternObjectInstanceType).name, position: -1 })),
+            (scope) => instances.map((element) => this.createObjectInstanceEntry(element, -1, scope)),
+            instances.map((element) => ({ name: element.name, position: -1 })),
             node
         );
     }
@@ -571,7 +569,8 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
     }
 
     /**
-     * Collects pattern entries (object instances and variables) from a pattern.
+     * Collects pattern entries (object instances and variables) from a pattern, including those
+     * of its model scope blocks (which do not scope names).
      *
      * @param pattern The pattern to collect entries from.
      * @param position The position in the parent scope.
@@ -584,7 +583,7 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
         scope: Scope<TypirLangiumSpecifics>,
         entries: ScopeEntry<TypirLangiumSpecifics>[]
     ): void {
-        for (const element of pattern?.elements ?? []) {
+        for (const element of flattenModelScopes(this.reflection, pattern?.elements ?? [])) {
             if (this.reflection.isInstance(element, PatternObjectInstance)) {
                 entries.push(this.createObjectInstanceEntry(element, position, scope));
             } else if (this.reflection.isInstance(element, PatternVariable)) {
@@ -621,7 +620,7 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
         position: number,
         initializations: ScopeLocalInitialization[]
     ): void {
-        for (const element of pattern?.elements ?? []) {
+        for (const element of flattenModelScopes(this.reflection, pattern?.elements ?? [])) {
             if (this.reflection.isInstance(element, PatternObjectInstance)) {
                 initializations.push({ name: element.name, position });
             } else if (this.reflection.isInstance(element, PatternVariable)) {
@@ -665,7 +664,7 @@ export class ModelTransformationTypirScopeProvider extends BaseScopeProvider<
     }
 
     /**
-     * Creates a scope entry for a parameter of the signature. Parameters are visible in the
+     * Creates a scope entry for a header parameter. Parameters are visible in the
      * whole transformation, at the transformation's own level (where the engine binds them
      * before the first statement).
      *

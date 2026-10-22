@@ -6,24 +6,24 @@ import {
     ForInVariable,
     MatchStatement,
     ModelTransformation,
+    Pattern,
     PatternApplicationCondition,
     PatternObjectInstance,
     PatternVariable,
-    TransformationParameter,
-    TransformationSignature
+    TransformationParameter
 } from "../grammar/modelTransformationTypes.js";
 import type { ModelTransformationType } from "../grammar/modelTransformationTypes.js";
 import type { AstReflection, ExtendedLangiumServices } from "@mdeo/language-common";
 import type { CancellationToken } from "vscode-jsonrpc";
 
-const { DefaultScopeComputation, AstUtils } = sharedImport("langium");
+const { DefaultScopeComputation, AstUtils, UriUtils } = sharedImport("langium");
 
 /**
  * The scope computation for the Model Transformation language.
  *
  * Registers PatternObjectInstance nodes as local symbols
- * in the closest non-Pattern/MatchStatement container, the parameters of the signature on the
- * transformation root, the outputs of a call in the block containing the call (for `if call`, in
+ * in the closest non-Pattern/MatchStatement container (seeing through model scope blocks, which
+ * do not scope names), the header parameters on the transformation root, the outputs of a call in the block containing the call (for `if call`, in
  * the condition, so they are visible in the then block only) and the variable of a `for … in`
  * loop on the loop.
  */
@@ -41,14 +41,15 @@ export class ModelTransformationScopeComputation extends DefaultScopeComputation
     /**
      * Collects exported symbols from a model transformation document.
      * Exports all PatternVariable and PatternObjectInstance nodes at any nesting depth.
-     * This is necessary for findUniqueName to work correctly. The signature is exported too,
-     * so that other transformations can import it.
+     * This is necessary for findUniqueName to work correctly. The root is exported too, under
+     * the file's base name, so that other transformations can import the file by its path and
+     * call it.
      */
-    override collectExportedSymbols(
+    override async collectExportedSymbols(
         document: LangiumDocument,
         cancelToken?: CancellationToken
     ): Promise<AstNodeDescription[]> {
-        return this.collectExportedSymbolsForNode(
+        const symbols = await this.collectExportedSymbolsForNode(
             document.parseResult.value,
             document,
             (root) => {
@@ -57,8 +58,7 @@ export class ModelTransformationScopeComputation extends DefaultScopeComputation
                     if (
                         this.astReflection.isInstance(node, PatternVariable) ||
                         this.astReflection.isInstance(node, PatternObjectInstance) ||
-                        this.astReflection.isInstance(node, ForInVariable) ||
-                        this.astReflection.isInstance(node, TransformationSignature)
+                        this.astReflection.isInstance(node, ForInVariable)
                     ) {
                         result.push(node);
                     }
@@ -67,6 +67,11 @@ export class ModelTransformationScopeComputation extends DefaultScopeComputation
             },
             cancelToken
         );
+        const root = document.parseResult.value;
+        if (this.astReflection.isInstance(root, ModelTransformation)) {
+            symbols.push(this.descriptions.createDescription(root, UriUtils.basename(document.uri), document));
+        }
+        return symbols;
     }
 
     /**
@@ -104,11 +109,20 @@ export class ModelTransformationScopeComputation extends DefaultScopeComputation
             return;
         }
         if (this.astReflection.isInstance(node, PatternObjectInstance)) {
+            // the innermost condition block or pattern, seeing through model scope blocks
+            let owner: AstNode | undefined = node.$container;
+            while (
+                owner != undefined &&
+                !this.astReflection.isInstance(owner, PatternApplicationCondition) &&
+                !this.astReflection.isInstance(owner, Pattern)
+            ) {
+                owner = owner.$container;
+            }
             let container: AstNode | undefined;
-            if (this.astReflection.isInstance(node.$container, PatternApplicationCondition)) {
-                container = node.$container;
+            if (this.astReflection.isInstance(owner, PatternApplicationCondition)) {
+                container = owner;
             } else {
-                container = node.$container?.$container;
+                container = owner?.$container;
                 if (this.astReflection.isInstance(container, MatchStatement)) {
                     container = container.$container;
                 }

@@ -40,13 +40,16 @@ import {
     type WhileExpressionStatementType,
     type ElseIfBranchType,
     type IfMatchStatementType,
-    type PatternApplicationConditionType
+    type PatternApplicationConditionType,
+    type PatternModelScopeType
 } from "../grammar/modelTransformationTypes.js";
 import { climbsAboveProjectRoot, resolveRelativeDocument, sharedImport } from "@mdeo/language-shared";
 import { TransformationCallValidator } from "./transformationCallValidator.js";
+import { ModelInputValidator } from "./modelInputValidator.js";
 import {
     TransformationDeclarationResolver,
     asPatternObjectInstance,
+    flattenModelScopes,
     type TypeInference
 } from "../features/transformationDeclarations.js";
 
@@ -66,7 +69,7 @@ export const ModelTransformationIssueCodes = {
 interface NamedElement {
     name: string;
     node: AstNode;
-    type: "object" | "variable" | "parameter" | "call output" | "loop variable";
+    type: "object" | "variable" | "parameter" | "call output" | "loop variable" | "import alias";
 }
 
 /**
@@ -75,6 +78,7 @@ interface NamedElement {
 interface ModelTransformationAstTypes {
     ModelTransformation: ModelTransformationType;
     PatternApplicationCondition: PatternApplicationConditionType;
+    PatternModelScope: PatternModelScopeType;
     PatternObjectInstance: PatternObjectInstanceType;
     PatternObjectInstanceReference: PatternObjectInstanceReferenceType;
     PatternObjectDelete: PatternObjectInstanceDeleteType;
@@ -99,6 +103,7 @@ export function registerModelTransformationValidationChecks(services: ExtendedLa
     const checks: ValidationChecks<ModelTransformationAstTypes> = {
         ModelTransformation: validator.validateTransformation.bind(validator),
         PatternApplicationCondition: validator.validateApplicationCondition.bind(validator),
+        PatternModelScope: validator.modelInputValidator.validateModelScope.bind(validator.modelInputValidator),
         PatternObjectInstance: validator.validateObjectInstance.bind(validator),
         PatternObjectInstanceReference: validator.validateObjectInstanceReference.bind(validator),
         PatternObjectDelete: validator.validateObjectInstanceDelete.bind(validator),
@@ -120,23 +125,29 @@ export function registerModelTransformationValidationChecks(services: ExtendedLa
  */
 export class ModelTransformationValidator extends BaseModelValidator {
     /**
-     * Creates a new {@link ModelTransformationValidator}.
-     *
-     * @param services The extended Langium services providing workspace, reflection, and document access
-     */
-    /**
-     * Validator for signatures, imports and calls.
+     * Validator for header declarations, imports and calls.
      */
     readonly callValidator: TransformationCallValidator;
+
+    /**
+     * Validator for model inputs and the scope blocks that read them.
+     */
+    readonly modelInputValidator: ModelInputValidator;
 
     /**
      * Resolver for the classes of parameters and call outputs.
      */
     private readonly declarations: TransformationDeclarationResolver;
 
+    /**
+     * Creates a new {@link ModelTransformationValidator}.
+     *
+     * @param services The extended Langium services providing workspace, reflection, and document access
+     */
     constructor(private readonly services: ExtendedLangiumServices) {
         super(services.shared.AstReflection);
         this.callValidator = new TransformationCallValidator(services);
+        this.modelInputValidator = new ModelInputValidator(services);
         this.declarations = new TransformationDeclarationResolver(
             services.shared.AstReflection,
             services.shared.workspace.LangiumDocuments,
@@ -153,6 +164,7 @@ export class ModelTransformationValidator extends BaseModelValidator {
     validateTransformation(transformation: ModelTransformationType, accept: ValidationAcceptor): void {
         this.validateMetamodelImport(transformation, accept);
         this.callValidator.validateTransformation(transformation, accept);
+        this.modelInputValidator.validateTransformation(transformation, accept);
 
         const allNames = new MultiMap<string, NamedElement>();
         this.collectAllNames(transformation, allNames);
@@ -221,7 +233,12 @@ export class ModelTransformationValidator extends BaseModelValidator {
      * @param names The multimap to add collected names to
      */
     private collectAllNames(transformation: ModelTransformationType, names: MultiMapType<string, NamedElement>): void {
-        for (const parameter of transformation.signature?.parameters ?? []) {
+        for (const fileImport of transformation.imports ?? []) {
+            if (fileImport.name) {
+                names.add(fileImport.name, { name: fileImport.name, node: fileImport, type: "import alias" });
+            }
+        }
+        for (const parameter of transformation.parameters ?? []) {
             // an optional element input that pins an object of the first pattern shares its name
             if (parameter.name && this.declarations.getPinnedObject(parameter) == undefined) {
                 names.add(parameter.name, { name: parameter.name, node: parameter, type: "parameter" });
@@ -384,13 +401,17 @@ export class ModelTransformationValidator extends BaseModelValidator {
      * Collects names from a pattern.
      *
      * Instances of a condition block live in their own graph, but their names take part in the
-     * same uniqueness check, so that every name identifies exactly one node.
+     * same uniqueness check, so that every name identifies exactly one node; so do the instances
+     * and variables of model scope blocks.
      *
      * @param pattern The pattern to collect names from
      * @param names The multimap to add collected names to
      */
-    private collectNamesFromPattern(pattern: PatternType | undefined, names: MultiMapType<string, NamedElement>): void {
-        for (const element of pattern?.elements ?? []) {
+    private collectNamesFromPattern(
+        pattern: { elements?: unknown[] } | undefined,
+        names: MultiMapType<string, NamedElement>
+    ): void {
+        for (const element of flattenModelScopes(this.reflection, pattern?.elements ?? [])) {
             if (this.reflection.isInstance(element, PatternObjectInstance)) {
                 if (element.name) {
                     names.add(element.name, { name: element.name, node: element, type: "object" });
@@ -400,15 +421,7 @@ export class ModelTransformationValidator extends BaseModelValidator {
                     names.add(element.name, { name: element.name, node: element, type: "variable" });
                 }
             } else if (this.reflection.isInstance(element, PatternApplicationCondition)) {
-                for (const conditionElement of element.elements ?? []) {
-                    if (this.reflection.isInstance(conditionElement, PatternObjectInstance) && conditionElement.name) {
-                        names.add(conditionElement.name, {
-                            name: conditionElement.name,
-                            node: conditionElement,
-                            type: "object"
-                        });
-                    }
-                }
+                this.collectNamesFromPattern(element as PatternApplicationConditionType, names);
             }
         }
     }
@@ -454,6 +467,7 @@ export class ModelTransformationValidator extends BaseModelValidator {
     validateApplicationCondition(condition: PatternApplicationConditionType, accept: ValidationAcceptor): void {
         const kind = condition.kind ?? "forbid";
         const elements = condition.elements ?? [];
+        this.modelInputValidator.validateConditionNotNested(condition, accept);
 
         if (elements.length === 0) {
             accept("error", `A '${kind}' block must contain at least one element.`, {
@@ -461,7 +475,7 @@ export class ModelTransformationValidator extends BaseModelValidator {
             });
         }
 
-        for (const element of elements) {
+        for (const element of flattenModelScopes(this.reflection, elements)) {
             if (this.reflection.isInstance(element, PatternObjectInstance)) {
                 const modifier = element.modifier?.modifier;
                 if (modifier != undefined) {
@@ -535,7 +549,7 @@ export class ModelTransformationValidator extends BaseModelValidator {
             return;
         }
 
-        const pattern = condition.$container as PatternType | undefined;
+        const pattern = condition.$container as { elements?: AstNode[] } | undefined;
         for (const sibling of pattern?.elements ?? []) {
             if (sibling === condition || !this.reflection.isInstance(sibling, PatternApplicationCondition)) {
                 continue;
@@ -737,6 +751,7 @@ export class ModelTransformationValidator extends BaseModelValidator {
         this.validateNoDuplicatePatternPropertyAssignments(ref.properties, accept);
 
         const declaration = ref.instance?.ref;
+        this.modelInputValidator.validateNodeReference(ref, accept);
         if (!declaration || this.callValidator.validateNodeReference(ref, "instance", declaration, accept)) {
             return;
         }
@@ -757,6 +772,7 @@ export class ModelTransformationValidator extends BaseModelValidator {
      */
     validateObjectInstanceDelete(del: PatternObjectInstanceDeleteType, accept: ValidationAcceptor): void {
         const declaration = del.instance?.ref;
+        this.modelInputValidator.validateNodeReference(del, accept);
         if (!declaration || this.callValidator.validateNodeReference(del, "instance", declaration, accept)) {
             return;
         }
@@ -850,6 +866,7 @@ export class ModelTransformationValidator extends BaseModelValidator {
         const targetDeclaration = target.object.ref;
         const sourceIsParameter = this.callValidator.validateNodeReference(source, "object", sourceDeclaration, accept);
         const targetIsParameter = this.callValidator.validateNodeReference(target, "object", targetDeclaration, accept);
+        this.modelInputValidator.validateLink(link, accept);
 
         this.validateLinkBase(
             link,
@@ -1105,7 +1122,7 @@ export class ModelTransformationValidator extends BaseModelValidator {
     private collectConnectedLinks(pattern: PatternType, objectInstance: PatternObjectInstanceType): PatternLinkType[] {
         const links: PatternLinkType[] = [];
 
-        for (const element of pattern.elements ?? []) {
+        for (const element of flattenModelScopes(this.reflection, pattern.elements ?? [])) {
             if (!this.reflection.isInstance(element, PatternLink)) {
                 continue;
             }

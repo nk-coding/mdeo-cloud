@@ -188,14 +188,14 @@ export class MdeoValidator {
         transformation: ModelTransformationType,
         accept: ValidationAcceptor
     ): void {
-        const required = requiredInputs(transformation.signature);
+        const required = requiredInputs(transformation);
         if (required.length === 0) {
             return;
         }
         const names = required.map((p) => `'${p.name}'`).join(", ");
         accept(
             "error",
-            `The transformation '${transformation.signature?.name}' at '${usingPath.path}' has required input${required.length > 1 ? "s" : ""} ${names}, so it cannot be a mutation operator: the optimizer passes no arguments. Give ${required.length > 1 ? "them defaults" : "it a default"}, or call it from an operator with 'call'.`,
+            `The transformation at '${usingPath.path}' has required input${required.length > 1 ? "s" : ""} ${names}, so it cannot be a mutation operator: the optimizer passes no arguments. Give ${required.length > 1 ? "them defaults" : "it a default"}, or call it from an operator with 'call'.`,
             {
                 node: usingPath,
                 property: "path"

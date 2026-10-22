@@ -40,6 +40,7 @@ import { registerModelTransformationSerializers } from "./features/modelTransfor
 import { ModelTransformationExternalReferenceCollector } from "./features/modelTransformationExternalReferenceCollector.js";
 import { ModelTransformationLinker } from "./features/modelTransformationLinker.js";
 import { ModelTransformationHoverProvider } from "./features/modelTransformationHoverProvider.js";
+import { ModelTransformationDefinitionProvider } from "./features/modelTransformationDefinitionProvider.js";
 import { NewFileActionHandler } from "./action-handlers/newFileActionHandler.js";
 import { RunModelTransformationActionHandler } from "./action-handlers/runModelTransformationActionHandler.js";
 import { ModelTransformationActionProvider } from "./features/modelTransformationActionProvider.js";
@@ -129,6 +130,7 @@ function createModelTransformationPlugin(languageJsUrl?: string): LangiumLanguag
                 CompletionProvider: (services) =>
                     new ModelTransformationCompletionProvider(services, expressionTypes, typeTypes),
                 HoverProvider: (services) => new ModelTransformationHoverProvider(services, expressionTypes, typeTypes),
+                DefinitionProvider: (services) => new ModelTransformationDefinitionProvider(services),
                 Formatter: (services) => new SerializerFormatter(services),
                 CodeActionProvider: (services) => new ModelTransformationCodeActionProvider(services)
             },

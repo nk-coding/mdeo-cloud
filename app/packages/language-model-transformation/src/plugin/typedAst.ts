@@ -23,7 +23,8 @@ export interface TypedAst {
     statements: TypedTransformationStatement[];
 
     /**
-     * The signature, when the transformation declares one.
+     * The header declarations (`in …` / `out …`) of the transformation. Always present; a file
+     * without declarations has an empty parameter list.
      */
     signature?: TypedTransformationSignature;
 
@@ -36,11 +37,13 @@ export interface TypedAst {
 }
 
 /**
- * The signature of a callable transformation.
+ * The inputs and outputs of a transformation (its header declarations). Every transformation
+ * file can be imported and called.
  */
 export interface TypedTransformationSignature {
     /**
-     * The name the transformation is called by.
+     * The display name of the transformation: the base name of its file including the
+     * extension, e.g. `move-component.mt` (for diagnostics and `failedAt`).
      */
     name: string;
 
@@ -51,7 +54,7 @@ export interface TypedTransformationSignature {
 }
 
 /**
- * A parameter of a signature.
+ * A header declaration (`in name: Type [= default]` / `out name: Type`).
  */
 export interface TypedTransformationParameter {
     /**
@@ -102,6 +105,15 @@ export interface TypedTransformationParameter {
      * the object is matched freely.
      */
     pinsNode?: boolean;
+
+    /**
+     * Whether the input is a model input: `in x: model` (no {@link collection}) or
+     * `in xs: List<model>` ({@link collection} `List`). The type index points to the builtin
+     * `model` type (or `List<model>`). A model input is always an `in` parameter without a default,
+     * neither an element nor optional; the engine passes models by reference (never copies).
+     * Absent (false) for every other parameter.
+     */
+    isModel?: boolean;
 }
 
 /**
@@ -147,7 +159,7 @@ export interface TypedCallStatement extends TypedTransformationStatement {
     callee: string;
 
     /**
-     * The callee's name, for messages.
+     * The alias the caller imports the callee under (`import "./f.mt" as alias`), for messages.
      */
     name: string;
 
@@ -334,6 +346,16 @@ export interface TypedPatternObjectInstance {
      * Property assignments.
      */
     properties: TypedPatternPropertyAssignment[];
+
+    /**
+     * The model the object lives in: the name of the model value (a `model` input or the
+     * variable of a `for … in` loop over a `List<model>` input) of the scope block
+     * (`in donor { … }`) the object is declared or referenced in, also through `forbid` /
+     * `require` blocks. Absent for objects of the implicit model (the model the transformation
+     * runs on). Scope blocks themselves do not appear in the typed AST: their elements are
+     * emitted in their place, and links get their model from their ends.
+     */
+    model?: string;
 }
 
 /**
