@@ -886,9 +886,37 @@ export function describeModel(model: ModelIdentity): string {
  * @returns e.g. `in maxCandidates: int = …`
  */
 export function renderParameter(parameter: TransformationParameterType): string {
-    const typeText = parameter.type?.$cstNode?.text ?? "?";
+    const typeText = renderTypeNode(parameter.type);
     const defaultText = parameter.defaultValue != undefined ? ` = ${parameter.defaultValue.$cstNode?.text ?? "…"}` : "";
     return `${parameter.direction} ${parameter.name}: ${typeText}${defaultText}`;
+}
+
+/**
+ * Renders a type node as source text: its own text when it was parsed, otherwise from its
+ * structure (a transformation loaded as an AST only, e.g. through the config's external
+ * references, has no CST).
+ *
+ * @param type The type node
+ * @returns e.g. `List<Component>` or `Placement?`; `?` without a type
+ */
+function renderTypeNode(type: AstNode | undefined): string {
+    if (type == undefined) {
+        return "?";
+    }
+    if (type.$cstNode != undefined) {
+        return type.$cstNode.text;
+    }
+    const { packageName, name, typeArgs, isNullable } = type as AstNode & {
+        packageName?: string;
+        name?: string;
+        typeArgs?: AstNode[];
+        isNullable?: boolean;
+    };
+    if (name == undefined) {
+        return "?";
+    }
+    const args = typeArgs != undefined && typeArgs.length > 0 ? `<${typeArgs.map(renderTypeNode).join(", ")}>` : "";
+    return `${packageName != undefined ? `${packageName}.` : ""}${name}${args}${isNullable ? "?" : ""}`;
 }
 
 /**
