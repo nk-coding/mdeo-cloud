@@ -69,16 +69,20 @@ jobs:
           DOCS_BASE: /${{ github.event.repository.name }}/
         run: npx vitepress build docs
 
+      # Publishing to GitHub Pages is disabled for now (see the deploy job); the site is still built
+      # and its samples validated as a check.
       - uses: actions/configure-pages@v6
-        if: github.event_name != 'pull_request'
+        if: ${{ false }}
 
       - uses: actions/upload-pages-artifact@v5
-        if: github.event_name != 'pull_request'
+        if: ${{ false }}
         with:
           path: website/docs/.vitepress/dist
 
   deploy:
-    if: github.event_name != 'pull_request'
+    # Disabled for now: this copy (nk-coding/mdeo-cloud-private) only publishes the container images
+    # (docker-publish.yml). Restore `github.event_name != 'pull_request'` to publish the docs again.
+    if: ${{ false }}
     needs: build
     runs-on: ubuntu-latest
     environment:
