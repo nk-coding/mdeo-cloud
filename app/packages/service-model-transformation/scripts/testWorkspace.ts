@@ -6,7 +6,6 @@ initializePluginContext();
 const { URI } = await import("langium");
 const { metamodelPluginProvider } = await import("@mdeo/language-metamodel");
 const { modelTransformationPluginProvider } = await import("@mdeo/language-model-transformation");
-const { configMdeoPluginProvider } = await import("@mdeo/language-config-mdeo");
 
 type AnyServices = any;
 
@@ -29,7 +28,7 @@ export interface HandlerRun<T> {
 }
 
 /**
- * A virtual project for language tests, without a backend: every language instance reads the
+ * A virtual project for running the language services without a backend: every language instance reads the
  * project's files from memory, and the ASTs of imported metamodels are computed by a metamodel
  * instance, as the metamodel service serves them (the same set-up as the headless harness of
  * the Palladio projects).
@@ -48,17 +47,14 @@ export class TestWorkspace {
     /**
      * Creates a fresh language instance for a file extension.
      */
-    private newInstance(extension: ".mm" | ".mt" | ".config", serviceModule?: unknown): TestInstance {
+    private newInstance(extension: ".mm" | ".mt"): TestInstance {
         const [provider, languageId] =
             extension === ".mm"
                 ? [metamodelPluginProvider, "metamodel"]
-                : extension === ".mt"
-                  ? [modelTransformationPluginProvider, "model-transformation"]
-                  : [configMdeoPluginProvider, "config-mdeo"];
+                : [modelTransformationPluginProvider, "model-transformation"];
         const pool = new LangiumInstancePool({
             maxInstances: 1,
             languagePluginProvider: provider,
-            serviceModule,
             languageId,
             extension,
             backendUrl: "http://localhost:1"
@@ -104,42 +100,6 @@ export class TestWorkspace {
             this.astCache.set(path, result.data);
         }
         return structuredClone(this.astCache.get(path));
-    }
-
-    /**
-     * Validates the MDEO sections (search, solver, runtime) of a configuration, as the config
-     * service's MDEO plugin does: the transformations it uses are loaded as external ASTs.
-     *
-     * @param handler The MDEO diagnostics request handler
-     * @param resolverModule The service module with the problem metamodel resolver
-     * @param path The configuration's project path
-     * @param text The MDEO sections of the configuration
-     * @param problemMetamodel The project path of the problem's metamodel
-     * @returns The diagnostics' messages
-     */
-    async configDiagnostics(
-        handler: (context: any) => Promise<any>,
-        resolverModule: unknown,
-        path: string,
-        text: string,
-        problemMetamodel: string
-    ): Promise<string[]> {
-        const instance = this.newInstance(".config", resolverModule);
-        const result = await handler({
-            body: {
-                text,
-                configFileUri: URI.file(path).toString(),
-                dependencyData: { optimization: { problem: { metamodelPath: problemMetamodel } } }
-            },
-            instance,
-            services: instance.services,
-            serverApi: instance.services.shared.ServerApi,
-            jwt: "",
-            contributionPlugins: []
-        });
-        return (result.diagnostics as { message: string; severity?: number }[])
-            .filter((d) => d.severity === 1)
-            .map((d) => d.message);
     }
 
     /**
