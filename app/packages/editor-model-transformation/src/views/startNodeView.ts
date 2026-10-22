@@ -1,7 +1,7 @@
 import type { GModelElement, RenderingContext } from "@eclipse-glsp/sprotty";
 import type { VNode } from "snabbdom";
 import { sharedImport, GNodeView, type GNode } from "@mdeo/editor-shared";
-import { hasDeclarationRows, renderDeclarationBox } from "./declarationBox.js";
+import { hasDeclarationRows, renderDeclarationText } from "./declarationText.js";
 
 const { injectable } = sharedImport("inversify");
 const { html } = sharedImport("@eclipse-glsp/sprotty");
@@ -10,7 +10,7 @@ const { html } = sharedImport("@eclipse-glsp/sprotty");
  * View for rendering start nodes.
  * Renders a filled circle representing the start of a control flow, similar to UML activity diagrams.
  * Uses an HTML div with border-radius so the bounding box correctly includes the border.
- * A transformation with inputs lists them below a smaller circle, in a box.
+ * A transformation with inputs lists them above the circle, as plain text.
  */
 @injectable()
 export class GStartNodeView extends GNodeView {
@@ -20,8 +20,8 @@ export class GStartNodeView extends GNodeView {
     static readonly RADIUS = 12;
 
     /**
-     * Renders the start node as a filled circle using an HTML div, or as a box with the circle
-     * and the input rows when the transformation has inputs.
+     * Renders the start node as a filled circle using an HTML div, with the input rows above it
+     * when the transformation has inputs.
      *
      * @param _model The node model
      * @param context The rendering context
@@ -34,7 +34,7 @@ export class GStartNodeView extends GNodeView {
         children: readonly GModelElement[]
     ): VNode {
         if (hasDeclarationRows(children)) {
-            return renderDeclarationBox(this.renderCircle(16), context, children);
+            return renderDeclarationText(this.renderCircle(GStartNodeView.RADIUS * 2), context, children, "above");
         }
         return this.renderCircle(GStartNodeView.RADIUS * 2);
     }
