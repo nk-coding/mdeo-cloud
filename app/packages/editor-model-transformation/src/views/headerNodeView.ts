@@ -1,5 +1,5 @@
 import type { GModelElement, RenderingContext } from "@eclipse-glsp/sprotty";
-import type { VNode } from "snabbdom";
+import type { VNode, VNodeStyle } from "snabbdom";
 import { GRectangularNodeView, sharedImport } from "@mdeo/editor-shared";
 import type { GRectangularNode } from "@mdeo/editor-shared";
 import { ModelTransformationElementType } from "@mdeo/protocol-model-transformation";
@@ -14,11 +14,22 @@ const { html } = sharedImport("@eclipse-glsp/sprotty");
  */
 @injectable()
 export class GHeaderNodeView extends GRectangularNodeView {
+    protected override renderForeignElement(
+        model: Readonly<GRectangularNode>,
+        context: RenderingContext,
+        children: readonly GModelElement[]
+    ): VNode {
+        const vnode = super.renderForeignElement(model, context, children);
+        const style: VNodeStyle = { ...vnode.data?.style };
+        style.borderRadius = "6px";
+        vnode.data = { ...vnode.data, style };
+        return vnode;
+    }
+
     protected override getClasses(_model: Readonly<GRectangularNode>): Record<string, boolean> {
         return {
             "border-2": true,
             "border-foreground": true,
-            "rounded-md": true,
             "bg-background": true,
             "box-border": true,
             flex: true,
@@ -47,7 +58,6 @@ export class GHeaderNodeView extends GRectangularNodeView {
                             "border-foreground": true,
                             "px-2": true,
                             "py-1.5": true,
-                            "text-sm": true,
                             italic: true,
                             "text-muted-foreground": true
                         }
