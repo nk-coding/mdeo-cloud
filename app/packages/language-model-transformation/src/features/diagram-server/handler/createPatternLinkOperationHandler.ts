@@ -25,7 +25,9 @@ import {
     type PatternModifierType,
     type PatternType,
     PatternApplicationCondition,
-    type PatternApplicationConditionType
+    PatternModelScope,
+    type PatternApplicationConditionType,
+    type PatternModelScopeType
 } from "../../../grammar/modelTransformationTypes.js";
 import type { ClassType } from "@mdeo/language-metamodel";
 import { ModelTransformationElementType, PatternModifierKind } from "@mdeo/protocol-model-transformation";
@@ -38,9 +40,9 @@ const { GrammarUtils } = sharedImport("langium");
 
 /**
  * A container that can hold pattern links: either the match pattern itself or one of its
- * application condition blocks.
+ * application condition blocks and model scope blocks.
  */
-type LinkContainer = PatternType | PatternApplicationConditionType;
+type LinkContainer = PatternType | PatternApplicationConditionType | PatternModelScopeType;
 
 /**
  * Parameters included in the create-edge schema for pattern links.
@@ -148,10 +150,13 @@ export class CreatePatternLinkOperationHandler extends BaseCreateEdgeOperationHa
             return undefined;
         }
         const reflection = this.localModelState.languageServices.shared.AstReflection;
-        const insideCondition = reflection.isInstance(container, PatternApplicationCondition);
+        // inside a condition block the block decides; an input model (scope block) is read-only
+        const withoutModifier =
+            reflection.isInstance(container, PatternApplicationCondition) ||
+            reflection.isInstance(container, PatternModelScope);
 
         const params = operation.schema.params as PatternLinkSchemaParams;
-        const modifier = insideCondition ? PatternModifierKind.NONE : this.modifierStringToKind(params.modifier);
+        const modifier = withoutModifier ? PatternModifierKind.NONE : this.modifierStringToKind(params.modifier);
 
         const associationResolver = new LinkAssociationResolver(
             this.localModelState.languageServices.shared.AstReflection
