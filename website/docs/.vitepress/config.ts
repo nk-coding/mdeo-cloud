@@ -1,15 +1,18 @@
 import { defineConfig } from "vitepress";
 import { mdeoLanguages } from "./languages.js";
 
-const repository = "https://github.com/mde-optimiser/mdeo-cloud";
+// The docs workflow sets both from the repository it runs in (GitHub Pages serves a project site
+// under /<repository name>/); the defaults are for local builds.
+const repository = process.env.DOCS_REPOSITORY ?? "https://github.com/mde-optimiser/mdeo-cloud";
+const base = process.env.DOCS_BASE ?? "/mdeo-cloud/";
 
 export default defineConfig({
     title: "MDEO Cloud",
     description: "A cloud-native, plugin-based platform for model-driven engineering optimisation.",
-    base: "/mdeo-cloud/",
+    base,
     cleanUrls: true,
     lastUpdated: true,
-    head: [["link", { rel: "icon", href: "/mdeo-cloud/favicon.svg" }]],
+    head: [["link", { rel: "icon", href: `${base}favicon.svg` }]],
     markdown: {
         languages: mdeoLanguages
     },

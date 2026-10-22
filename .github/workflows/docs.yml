@@ -60,8 +60,13 @@ jobs:
         working-directory: website
         run: npm run validate
 
+      # Publish for the repository this runs in (e.g. nk-coding/mdeo-cloud-private), not for the
+      # upstream organisation: Pages serves the site under /<repository name>/.
       - name: Build site
         working-directory: website
+        env:
+          DOCS_REPOSITORY: https://github.com/${{ github.repository }}
+          DOCS_BASE: /${{ github.event.repository.name }}/
         run: npx vitepress build docs
 
       - uses: actions/configure-pages@v6
