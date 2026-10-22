@@ -4,6 +4,7 @@ import com.mdeo.metamodel.Metamodel
 import com.mdeo.metamodel.Model
 import com.mdeo.metamodel.ModelInstance
 import com.mdeo.modeltransformation.graph.CountingModelStatistics
+import com.mdeo.modeltransformation.graph.ModelGraph
 import com.mdeo.modeltransformation.graph.ModelStatistics
 import com.mdeo.modeltransformation.ast.EdgeLabelUtils
 import com.mdeo.modeltransformation.runtime.InstanceNameRegistry
@@ -113,30 +114,119 @@ class MdeoGraph private constructor(
                 maxNumericInstanceName = maxOf(maxNumericInstanceName, name.toIntOrNull() ?: -1)
             }
             graph.nextVertexId = maxOf(graph.nextVertexId, maxNumericInstanceName + 1)
-            val classMeta = metamodel.metadata.classes
-            for ((_, instance) in model.instancesByName) {
-                val outVertex = vertexByInstance[instance] ?: continue
-                val meta = classMeta[outVertex.label] ?: continue
-                for ((roleName, linkMapping) in meta.linkFields) {
-                    if (!linkMapping.isOutgoing) continue
-                    val rawValue = instance.getPropertyByKey(roleName) ?: continue
-                    val edgeLabel = EdgeLabelUtils.computeEdgeLabel(roleName, linkMapping.oppositeFieldName)
-                    when {
-                        linkMapping.isMultiple && rawValue is Set<*> -> {
-                            for (target in rawValue) {
-                                val inVertex = vertexByInstance[target] ?: continue
-                                graph.addEdgeInternal(outVertex, inVertex, edgeLabel, updateAssociations = false)
-                            }
+            graph.wireEdges(model.instancesByName.values, vertexByInstance) { graph.nextEdgeId++ }
+            return graph
+        }
+    }
+
+    /**
+     * Adds the edges the outgoing link fields of [instances] describe, between their vertices in
+     * [vertexByInstance], in the order of [instances]; a link to an instance without a vertex
+     * there is skipped.
+     *
+     * @param instances The instances whose links become edges, in order.
+     * @param vertexByInstance The vertices, by backing instance.
+     * @param nextId Supplies the ID of each new edge.
+     */
+    private fun wireEdges(
+        instances: Collection<ModelInstance>,
+        vertexByInstance: Map<ModelInstance, MdeoVertex>,
+        nextId: () -> Int
+    ) {
+        val classMeta = metamodel.metadata.classes
+        for (instance in instances) {
+            val outVertex = vertexByInstance[instance] ?: continue
+            val meta = classMeta[outVertex.label] ?: continue
+            for ((roleName, linkMapping) in meta.linkFields) {
+                if (!linkMapping.isOutgoing) continue
+                val rawValue = instance.getPropertyByKey(roleName) ?: continue
+                val edgeLabel = EdgeLabelUtils.computeEdgeLabel(roleName, linkMapping.oppositeFieldName)
+                when {
+                    linkMapping.isMultiple && rawValue is Set<*> -> {
+                        for (target in rawValue) {
+                            val inVertex = vertexByInstance[target] ?: continue
+                            addEdgeInternal(outVertex, inVertex, edgeLabel, updateAssociations = false, id = nextId())
                         }
-                        rawValue is ModelInstance -> {
-                            val inVertex = vertexByInstance[rawValue] ?: continue
-                            graph.addEdgeInternal(outVertex, inVertex, edgeLabel, updateAssociations = false)
-                        }
+                    }
+                    rawValue is ModelInstance -> {
+                        val inVertex = vertexByInstance[rawValue] ?: continue
+                        addEdgeInternal(outVertex, inVertex, edgeLabel, updateAssociations = false, id = nextId())
                     }
                 }
             }
-            return graph
         }
+    }
+
+    // ---- Model inputs ----
+
+    /**
+     * The ID of the next vertex of a model input. Model inputs count downwards from -1, apart from
+     * the implicit model's IDs, so that loading and removing them leaves [nextVertexId] — and with
+     * it the IDs of the vertices a transformation creates — exactly as without them.
+     */
+    private var nextModelInputVertexId: Int = -1
+
+    /** The ID of the next edge of a model input; see [nextModelInputVertexId]. */
+    private var nextModelInputEdgeId: Int = -1
+
+    /**
+     * Adds the instances of a model input as read-only vertices of [modelSlot], with the edges
+     * their link fields describe among them.
+     *
+     * @param modelSlot The model-input slot, at least 1.
+     * @param instances The input's instances by name, owned by this graph from now on (a copy,
+     *   never the instances of another live graph).
+     * @return The vertices, by instance name.
+     */
+    internal fun loadModelInput(modelSlot: Int, instances: Map<String, ModelInstance>): Map<String, MdeoVertex> {
+        require(modelSlot != ModelGraph.IMPLICIT_MODEL_SLOT) { "Slot $modelSlot is the implicit model's" }
+        val vertexByInstance = IdentityHashMap<ModelInstance, MdeoVertex>(instances.size)
+        val vertexByName = LinkedHashMap<String, MdeoVertex>(instances.size * 2)
+        for ((name, instance) in instances) {
+            val vertex = addVertexBacked(instance, nextModelInputVertexId--, modelSlot)
+            vertexByInstance[instance] = vertex
+            vertexByName[name] = vertex
+        }
+        wireEdges(instances.values, vertexByInstance) { nextModelInputEdgeId-- }
+        return vertexByName
+    }
+
+    /**
+     * Removes the vertices of every model input ([loadModelInput]) and their edges, leaving the
+     * implicit model's vertices, edges, iteration order and label counts as they were.
+     *
+     * A model input's edges only connect its own vertices (its vertices refuse any other edge,
+     * see [MdeoVertex.checkWritable]), so no implicit vertex's adjacency or backing instance has
+     * to be updated. One pass over [vertexList] and over the removed vertices' edges.
+     *
+     * @return The IDs of the removed vertices.
+     */
+    internal fun removeModelInputs(): List<Int> {
+        val removed = vertexList.filter { it.isModelInput }
+        if (removed.isEmpty()) return emptyList()
+        vertexList.removeIf { it.isModelInput }
+        for (vertex in removed) {
+            vertexMap.remove(vertex.id)
+            vertexLabelCounts.computeIfPresent(vertex.label) { _, n -> if (n <= 1) null else n - 1 }
+            vertex.removed = true
+            for (adjacency in listOfNotNull(vertex.outEdges, vertex.inEdges)) {
+                for (edges in adjacency.values) {
+                    for (edge in edges) {
+                        edge as MdeoEdge
+                        if (edgeMap.remove(edge.id) == null) continue
+                        edgeLabelCounts.computeIfPresent(edge.label) { _, n -> if (n <= 1) null else n - 1 }
+                        edge.removed = true
+                    }
+                }
+            }
+        }
+        for (label in removed.mapTo(HashSet()) { it.label }) {
+            val bucket = verticesByLabel[label] ?: continue
+            bucket.removeIf { it.isModelInput }
+            if (bucket.isEmpty()) verticesByLabel.remove(label)
+        }
+        invalidateStatistics()
+        return removed.map { it.id }
     }
 
     private val graphFeatures = MdeoGraphFeatures()
@@ -300,13 +390,21 @@ class MdeoGraph private constructor(
     /**
      * Adds a vertex backed by an existing [ModelInstance].
      *
-     * Used internally during graph construction from an existing [Model].
+     * Used internally during graph construction from an existing [Model], and for the vertices
+     * of a model input ([loadModelInput]).
+     *
+     * @param instance The backing instance, owned by this graph from now on.
+     * @param id The vertex ID.
+     * @param modelSlot The vertex's model slot.
      */
-    private fun addVertexBacked(instance: ModelInstance): MdeoVertex {
-        val id = nextVertexId++
+    private fun addVertexBacked(
+        instance: ModelInstance,
+        id: Int = nextVertexId++,
+        modelSlot: Int = ModelGraph.IMPLICIT_MODEL_SLOT
+    ): MdeoVertex {
         val className = metamodel.classNameOf(instance)
         val metadata = metamodel.metadata.classes[className]
-        val vertex = MdeoVertex(id, className, this, instance, metadata)
+        val vertex = MdeoVertex(id, className, this, instance, metadata, modelSlot)
         vertexMap[id] = vertex
         settleVertexList()
         vertexList.add(vertex)
@@ -357,9 +455,9 @@ class MdeoGraph private constructor(
         inVertex: MdeoVertex,
         label: String,
         updateAssociations: Boolean,
-        vararg keyValues: Any
+        vararg keyValues: Any,
+        id: Int = nextEdgeId++
     ): Edge {
-        val id = nextEdgeId++
         val edge = MdeoEdge(id, outVertex, label, inVertex)
 
         edgeMap[id] = edge
@@ -408,6 +506,8 @@ class MdeoGraph private constructor(
             metamodel, newVertexMap, newVertexList, newEdgeMap,
             nextVertexId, nextEdgeId, nextVpId
         )
+        copy.nextModelInputVertexId = nextModelInputVertexId
+        copy.nextModelInputEdgeId = nextModelInputEdgeId
         // A deep copy has exactly this graph's label distribution; copying the counters is
         // O(labels) and saves the copy a full pass over its own vertices and edges.
         copy.vertexLabelCounts.putAll(vertexLabelCounts)
@@ -419,7 +519,7 @@ class MdeoGraph private constructor(
             val old = vertex.backingInstance
             val copiedInstance = old.copy()
             oldToNew[old] = copiedInstance
-            val copiedVertex = MdeoVertex(vertex.id, vertex.label, copy, copiedInstance, vertex.classMetadata)
+            val copiedVertex = MdeoVertex(vertex.id, vertex.label, copy, copiedInstance, vertex.classMetadata, vertex.modelSlot)
             newVertexMap[vertex.id] = copiedVertex
             newVertexList.add(copiedVertex)
             copy.verticesByLabel
