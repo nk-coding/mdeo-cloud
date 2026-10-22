@@ -20,7 +20,10 @@ import {
     type ArchiveBlockType,
     type RuntimeSectionType,
     type RuntimeTimeoutBlockType,
-    type RuntimeResourcesBlockType
+    type RuntimeResourcesBlockType,
+    MutationStepNumeric,
+    MutationStepFixedN,
+    MutationStepInterval
 } from "../grammar/mdeoTypes.js";
 import {
     ModelTransformation,
@@ -798,6 +801,40 @@ export class MdeoValidator {
     }
 
     /**
+     * Validates the mutation step: step counts are not negative (0 applies no mutation step), and an
+     * interval draws from [lower, upper), so its upper bound must be above its lower one.
+     *
+     * @param mutation The mutation block to validate
+     * @param accept The validation acceptor
+     */
+    private validateMutationStep(mutation: MutationBlockType, accept: ValidationAcceptor): void {
+        const step = mutation.step[0];
+        if (step == undefined) {
+            return;
+        }
+        const negative = (value: number, property: string) => {
+            if (value < 0) {
+                accept("error", "A mutation step count cannot be negative.", { node: step, property });
+            }
+        };
+        if (this.reflection.isInstance(step, MutationStepNumeric)) {
+            negative(step.value, "value");
+        } else if (this.reflection.isInstance(step, MutationStepFixedN)) {
+            negative(step.n, "n");
+        } else if (this.reflection.isInstance(step, MutationStepInterval)) {
+            negative(step.lower, "lower");
+            negative(step.upper, "upper");
+            if (step.upper <= step.lower) {
+                accept(
+                    "error",
+                    `interval(lower, upper) draws from [lower, upper), so upper must be above lower: write interval(${step.lower}, ${step.lower + 1}) or fixed(${step.lower}) for exactly ${step.lower}.`,
+                    { node: step, property: "upper" }
+                );
+            }
+        }
+    }
+
+    /**
      * Validates the mutation sub-block.
      * Checks strategy and selection values against allowed identifiers.
      *
@@ -811,6 +848,8 @@ export class MdeoValidator {
         this.checkNoDuplicateKeys(mutation, "application", accept);
         this.checkNoDuplicateKeys(mutation, "credit", accept);
         this.checkNoDuplicateKeys(mutation, "repair", accept);
+
+        this.validateMutationStep(mutation, accept);
 
         const strategy = mutation.strategy[0];
         if (strategy != undefined && !VALID_MUTATION_STRATEGIES.has(strategy)) {
