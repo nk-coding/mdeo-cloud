@@ -4,13 +4,11 @@ using "../architecture.mm"
 // the pattern; a non-nullable output must be assigned on every path that succeeds.
 // `placement` is optional and pins the object of the same name: a caller that passes one moves
 // that placement's component; with none passed (as a mutation operator) any placement matches.
-transformation moveComponent(
-    in placement: Placement?,
-    in maxCandidates: int = 0,
-    out moved: Component,
-    out source: Container,
-    out target: Container
-)
+in placement: Placement?
+in maxCandidates: int = 0
+out moved: Component
+out source: Container
+out target: Container
 
 match {
     placement: Placement { }

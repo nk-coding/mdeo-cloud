@@ -1,6 +1,6 @@
 using "./microservices.mm"
-import { moveComponent } from "./generic/move-component.mt"
-import { followReader } from "./sync/follow-reader.mt"
+import "./generic/move-component.mt" as moveComponent
+import "./sync/follow-reader.mt" as followReader
 
 // Moves a service, not just any component: the placement found here is passed on and pins
 // moveComponent's placement. If it has no candidate to move to, nothing changes.
