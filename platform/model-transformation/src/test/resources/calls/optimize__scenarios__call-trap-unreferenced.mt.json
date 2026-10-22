@@ -209,6 +209,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "call-trap-unreferenced.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/count-others.mt": {
    "types": [
@@ -524,7 +528,7 @@
     }
    ],
    "signature": {
-    "name": "countOthers",
+    "name": "count-others.mt",
     "parameters": [
      {
       "name": "seed",

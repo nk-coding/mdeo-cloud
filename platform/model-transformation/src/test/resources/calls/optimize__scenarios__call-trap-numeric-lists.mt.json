@@ -554,5 +554,9 @@
     ]
    }
   }
- ]
+ ],
+ "signature": {
+  "name": "call-trap-numeric-lists.mt",
+  "parameters": []
+ }
 }

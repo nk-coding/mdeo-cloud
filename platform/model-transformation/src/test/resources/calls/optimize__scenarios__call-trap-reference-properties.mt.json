@@ -111,6 +111,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "call-trap-reference-properties.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/reshape.mt": {
    "types": [
@@ -202,7 +206,7 @@
     }
    ],
    "signature": {
-    "name": "reshape",
+    "name": "reshape.mt",
     "parameters": [
      {
       "name": "rc",

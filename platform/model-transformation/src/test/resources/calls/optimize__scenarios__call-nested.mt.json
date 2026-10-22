@@ -66,6 +66,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "call-nested.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/move-and-sync.mt": {
    "types": [
@@ -180,7 +184,7 @@
     }
    ],
    "signature": {
-    "name": "moveAndSync",
+    "name": "move-and-sync.mt",
     "parameters": [
      {
       "name": "movedTo",
@@ -469,7 +473,7 @@
     }
    ],
    "signature": {
-    "name": "moveComponent",
+    "name": "move-component.mt",
     "parameters": [
      {
       "name": "maxCandidates",
@@ -670,7 +674,7 @@
     }
    ],
    "signature": {
-    "name": "followReader",
+    "name": "follow-reader.mt",
     "parameters": [
      {
       "name": "moved",

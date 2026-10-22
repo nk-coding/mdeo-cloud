@@ -448,6 +448,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "call-trap-injective.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/mates-of.mt": {
    "types": [
@@ -568,7 +572,7 @@
     }
    ],
    "signature": {
-    "name": "matesOf",
+    "name": "mates-of.mt",
     "parameters": [
      {
       "name": "seed",

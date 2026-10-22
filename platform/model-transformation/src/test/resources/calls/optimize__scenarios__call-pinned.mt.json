@@ -121,6 +121,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "call-pinned.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/move-placement.mt": {
    "types": [
@@ -286,7 +290,7 @@
     }
    ],
    "signature": {
-    "name": "movePlacement",
+    "name": "move-placement.mt",
     "parameters": [
      {
       "name": "placement",

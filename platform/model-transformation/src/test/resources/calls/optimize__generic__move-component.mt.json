@@ -276,7 +276,7 @@
   }
  ],
  "signature": {
-  "name": "moveComponent",
+  "name": "move-component.mt",
   "parameters": [
    {
     "name": "maxCandidates",

@@ -159,7 +159,7 @@
   }
  ],
  "signature": {
-  "name": "followReader",
+  "name": "follow-reader.mt",
   "parameters": [
    {
     "name": "moved",

@@ -245,6 +245,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "call-trap-reference-cast.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/fill-bag.mt": {
    "types": [
@@ -526,7 +530,7 @@
     }
    ],
    "signature": {
-    "name": "fillBag",
+    "name": "fill-bag.mt",
     "parameters": [
      {
       "name": "target",
