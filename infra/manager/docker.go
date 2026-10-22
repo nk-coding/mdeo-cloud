@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -38,6 +39,9 @@ type Docker interface {
 	Down(ctx context.Context, file string) error
 	// Ps lists the stack's containers.
 	Ps(ctx context.Context, file string) ([]Container, error)
+	// Restart restarts one container of the stack (docker restart): same container, same
+	// volumes, nothing removed.
+	Restart(ctx context.Context, container string) error
 }
 
 // ComposeCLI implements Docker with the docker CLI and its compose plugin.
@@ -200,4 +204,24 @@ func parsePs(out string) ([]Container, error) {
 		cs = append(cs, c)
 	}
 	return cs, sc.Err()
+}
+
+// containerNamePattern is what compose names containers.
+var containerNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
+
+func (c *ComposeCLI) Restart(ctx context.Context, container string) error {
+	if !containerNamePattern.MatchString(container) {
+		return fmt.Errorf("refusing to restart %q: not a container name", container)
+	}
+	// Only a container of the stack's own project: never the manager, never anything else.
+	out, err := run(ctx, "docker", "inspect", "--format", `{{index .Config.Labels "com.docker.compose.project"}}`, container)
+	if err != nil {
+		return err
+	}
+	if p := strings.TrimSpace(out); p != c.Project {
+		return fmt.Errorf("refusing to restart %q: it belongs to project %q, not %q", container, p, c.Project)
+	}
+	c.log("docker restart " + container)
+	_, err = run(ctx, "docker", "restart", "--time", "30", container)
+	return err
 }

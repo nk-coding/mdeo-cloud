@@ -52,6 +52,7 @@ func NewWeb(e *Engine, version string) *Web {
 			return t.UTC().Format("2006-01-02 15:04:05 UTC")
 		},
 		"gib": func(b int64) string { return fmt.Sprintf("%.0f GiB", float64(b)/(1<<30)) },
+		"dur": func(d time.Duration) string { return d.String() },
 		"val": func(l Limit, s Settings) int { return l.Get(s) },
 		"group": func(prefix string) []Limit {
 			var out []Limit
@@ -111,6 +112,8 @@ type statusView struct {
 	Warnings   []string
 	Problems   []string
 	Version    string
+	Heal       HealPolicy
+	Healing    bool
 }
 
 func (w *Web) status() statusView {
@@ -118,7 +121,8 @@ func (w *Web) status() statusView {
 	cs, err := w.containers()
 	v := statusView{State: st, Current: cur, Busy: busy, Containers: cs, Host: w.Engine.Host,
 		Pinning: PinningNodes(st.Desired, w.Engine.Host), Warnings: st.Desired.Warnings(),
-		Problems: st.Desired.Validate(), Version: w.Version}
+		Problems: st.Desired.Validate(), Version: w.Version, Heal: w.Engine.Heal,
+		Healing: cur != nil && cur.Action == "auto-heal"}
 	if err != nil {
 		v.PsError = err.Error()
 	}
@@ -167,6 +171,10 @@ func (w *Web) statusJSON(rw http.ResponseWriter, r *http.Request) {
 		"running": v.State.Running, "desired": v.State.Desired, "lastKnownGood": v.State.LastKnownGood,
 		"journal": v.State.Journal, "lastResult": v.State.LastResult, "current": v.Current, "busy": v.Busy,
 		"health": v.Health, "healthy": v.Healthy, "containers": v.Containers, "version": v.Version,
+		"heals": v.State.Heals, "healCount": v.State.HealCount,
+		"autoHeal": map[string]interface{}{"enabled": v.Heal.Enabled, "intervalSeconds": v.Heal.Interval.Seconds(),
+			"graceSeconds": v.Heal.Grace.Seconds(), "backoffBaseSeconds": v.Heal.BackoffBase.Seconds(),
+			"backoffMaxSeconds": v.Heal.BackoffMax.Seconds()},
 	})
 }
 

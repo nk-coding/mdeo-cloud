@@ -75,7 +75,8 @@ Every change is validated, checked with `docker compose config` and its images p
 anything running is touched; it is then applied and must become healthy, otherwise the manager
 returns to the last settings the stack was healthy with. The manager runs as its own compose
 project with `restart: always`, keeps its state on disk and, after a crash or reboot, finishes or
-undoes an interrupted change. Volumes are never removed.
+undoes an interrupted change. While the stack is up it also restarts containers that stay
+unhealthy and recreates missing ones, with backoff. Volumes are never removed.
 
 ```bash
 # on the server, in a directory with docker-compose.manager.yaml, .env and config/stack.env

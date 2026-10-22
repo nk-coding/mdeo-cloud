@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-{{ if .Busy }}<meta http-equiv="refresh" content="5">{{ end }}
+{{ if and .Busy (not .Healing) }}<meta http-equiv="refresh" content="5">{{ end }}
 <title>mdeo manager</title>
 <style>
   :root { --fg:#1d232b; --muted:#5b6672; --bg:#f6f7f9; --card:#fff; --line:#d9dee4; --ok:#1d7a3a; --bad:#b3261e; --warn:#8a5a00; --accent:#1f5fae; }
@@ -44,7 +44,7 @@
 
 {{ if .Err }}<div class="banner bad">{{ .Err }}</div>{{ end }}
 {{ if .Msg }}<div class="banner ok">{{ .Msg }}</div>{{ end }}
-{{ if .Busy }}<div class="banner busy"><strong>Running: {{ .Current.Action }}</strong> (since {{ ts .Current.Started }}). The page reloads every 5 s; every action is locked until it has finished.</div>{{ end }}
+{{ if and .Busy (not .Healing) }}<div class="banner busy"><strong>Running: {{ .Current.Action }}</strong> (since {{ ts .Current.Started }}). The page reloads every 5 s; every action is locked until it has finished.</div>{{ end }}
 
 <section>
   <h2>Deployment</h2>
@@ -74,13 +74,31 @@
 </section>
 {{ end }}
 
-{{ if .Busy }}
+{{ if and .Busy (not .Healing) }}
 <section>
   <h2>In progress: {{ .Current.Action }}</h2>
   <pre>{{ range .Current.Log }}{{ . }}
 {{ end }}</pre>
 </section>
 {{ end }}
+
+<section>
+  <h2>Auto-heal</h2>
+  {{ if .Heal.Enabled }}
+  <p class="muted">While the stack is up and no action runs, the manager checks it every {{ dur .Heal.Interval }}. A container unhealthy for more than {{ dur .Heal.Grace }} is restarted (docker restart); a missing or stopped container is recreated (docker compose up). Repeated repairs of a service wait {{ dur .Heal.BackoffBase }}, doubling up to {{ dur .Heal.BackoffMax }}.</p>
+  {{ else }}<p class="warn">Off (AUTO_HEAL=false).</p>{{ end }}
+  <p>{{ .State.HealCount }} automatic repair(s) so far.</p>
+  {{ if .State.Heals }}
+  <div class="scroll">
+  <table>
+    <tr><th>Time</th><th>Service</th><th>Action</th><th>Attempt</th><th>Reason</th><th>Result</th></tr>
+    {{ range .State.Heals }}
+    <tr><td>{{ ts .Time }}</td><td>{{ .Service }}</td><td>{{ .Action }}</td><td>{{ .Attempt }}</td><td>{{ .Reason }}</td><td>{{ if .OK }}<span class="ok">done</span>{{ else }}<span class="bad">{{ .Error }}</span>{{ end }}</td></tr>
+    {{ end }}
+  </table>
+  </div>
+  {{ end }}
+</section>
 
 <section>
   <h2>Change</h2>
@@ -95,7 +113,7 @@
         <input id="simTag" name="simTag" type="text" required pattern="[A-Za-z0-9_][A-Za-z0-9_.\-]{0,127}" value="{{ .State.Desired.SimTag }}">
         <input type="hidden" name="csrf" value="{{ $.CSRF }}">
         <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> recreate the changed services</label>
-        <button {{ if $.Busy }}disabled{{ end }}>Change versions</button>
+        <button {{ if and $.Busy (not $.Healing) }}disabled{{ end }}>Change versions</button>
       </form>
     </section>
     <section>
@@ -107,7 +125,7 @@
         {{ end }}
         <input type="hidden" name="csrf" value="{{ $.CSRF }}">
         <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> recreate all optimizer nodes</label>
-        <button {{ if $.Busy }}disabled{{ end }}>Apply</button>
+        <button {{ if and $.Busy (not $.Healing) }}disabled{{ end }}>Apply</button>
       </form>
     </section>
     <section>
@@ -119,7 +137,7 @@
         {{ end }}
         <input type="hidden" name="csrf" value="{{ $.CSRF }}">
         <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> recreate all simulator instances</label>
-        <button {{ if $.Busy }}disabled{{ end }}>Apply</button>
+        <button {{ if and $.Busy (not $.Healing) }}disabled{{ end }}>Apply</button>
       </form>
     </section>
     <section>
@@ -129,7 +147,7 @@
         <p class="muted">Each instance may use only the CPUs of its node, and its memory is then allocated there. Use simulator and optimizer instance counts that are multiples of the node count, so every node gets the same load. Databases, backend and plugin services are never pinned.</p>
         <input type="hidden" name="csrf" value="{{ $.CSRF }}">
         <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> recreate optimizer and simulator instances</label>
-        <button {{ if $.Busy }}disabled{{ end }}>Apply</button>
+        <button {{ if and $.Busy (not $.Healing) }}disabled{{ end }}>Apply</button>
       </form>
     </section>
   </div>
@@ -143,21 +161,21 @@
       <p class="muted">Recreates every container with the current settings (databases included; their data is kept).</p>
       <input type="hidden" name="csrf" value="{{ $.CSRF }}">
       <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> restart everything</label>
-      <button class="danger" {{ if $.Busy }}disabled{{ end }}>Restart</button>
+      <button class="danger" {{ if and $.Busy (not $.Healing) }}disabled{{ end }}>Restart</button>
     </form>
     <form method="post" action="/action/down">
       <strong>Down</strong>
       <p class="muted">Stops and removes all containers. Volumes (database data) are kept. Stays down across reboots until Up.</p>
       <input type="hidden" name="csrf" value="{{ $.CSRF }}">
       <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> take mdeo down</label>
-      <button class="danger" {{ if $.Busy }}disabled{{ end }}>Down</button>
+      <button class="danger" {{ if and $.Busy (not $.Healing) }}disabled{{ end }}>Down</button>
     </form>
     <form method="post" action="/action/up">
       <strong>Up</strong>
       <p class="muted">Starts the stack with the current settings and waits until it is healthy.</p>
       <input type="hidden" name="csrf" value="{{ $.CSRF }}">
       <label class="confirm"><input type="checkbox" name="confirm" value="yes" required> bring mdeo up</label>
-      <button {{ if $.Busy }}disabled{{ end }}>Up</button>
+      <button {{ if and $.Busy (not $.Healing) }}disabled{{ end }}>Up</button>
     </form>
   </div>
 </section>

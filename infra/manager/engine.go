@@ -32,10 +32,17 @@ type Engine struct {
 	// PullTimeout bounds one image pull.
 	PullTimeout time.Duration
 
+	// Heal is the policy of the heal loop (heal.go).
+	Heal HealPolicy
+
 	mu      sync.Mutex
 	state   State
 	busy    bool
+	healing bool
 	current *Result
+	tracks  map[string]*healTrack
+	// now is the clock of the heal loop (tests replace it).
+	now func() time.Time
 	// Logf receives every action log line (the container log of the manager).
 	Logf func(format string, args ...interface{})
 }
@@ -48,7 +55,8 @@ func NewEngine(dir string, d Docker, cfg StackConfig, host Host, initial Setting
 		return nil, err
 	}
 	e := &Engine{Dir: dir, Docker: d, Cfg: cfg, Host: host, HealthTimeout: 10 * time.Minute,
-		PollInterval: 5 * time.Second, PullTimeout: 30 * time.Minute, Logf: func(string, ...interface{}) {}}
+		PollInterval: 5 * time.Second, PullTimeout: 30 * time.Minute, Logf: func(string, ...interface{}) {},
+		Heal: DefaultHealPolicy(), tracks: map[string]*healTrack{}, now: time.Now}
 	st, err := LoadState(dir)
 	switch {
 	case err == nil:
@@ -125,6 +133,13 @@ func (a action) get() State {
 // start runs fn as the one action, in the background. It fails with ErrBusy while another runs.
 func (e *Engine) start(name string, fn func(ctx context.Context, a action) (bool, string)) error {
 	e.mu.Lock()
+	// The heal loop holds the lock only briefly (one check, at most one restart); an operator's
+	// action waits for it instead of being refused.
+	for deadline := time.Now().Add(90 * time.Second); e.busy && e.healing && time.Now().Before(deadline); {
+		e.mu.Unlock()
+		time.Sleep(50 * time.Millisecond)
+		e.mu.Lock()
+	}
 	if e.busy {
 		e.mu.Unlock()
 		return ErrBusy

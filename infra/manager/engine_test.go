@@ -23,6 +23,9 @@ type fakeDocker struct {
 	pingErr           error
 	running           map[string]Container
 	ups, downs, pulls int
+	restarts          []string
+	// afterRestart is the health a restarted container reports (default "starting").
+	afterRestart string
 	// blockUp, when set, is waited on inside Up (to hold an action open).
 	blockUp chan struct{}
 }
@@ -532,4 +535,35 @@ func TestHealth(t *testing.T) {
 			t.Fatalf("case %d counted as healthy", i)
 		}
 	}
+}
+
+func (f *fakeDocker) Restart(ctx context.Context, container string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for svc, c := range f.running {
+		if c.Name == container {
+			f.restarts = append(f.restarts, svc)
+			c.Health = f.afterRestart
+			if c.Health == "" {
+				c.Health = "starting"
+			}
+			f.running[svc] = c
+			return nil
+		}
+	}
+	return errors.New("no such container " + container)
+}
+
+func (f *fakeDocker) setHealth(svc, h string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c := f.running[svc]
+	c.Health = h
+	f.running[svc] = c
+}
+
+func (f *fakeDocker) restartCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.restarts)
 }

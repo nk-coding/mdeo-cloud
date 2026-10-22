@@ -23,6 +23,23 @@ type State struct {
 	Journal *Journal `json:"journal,omitempty"`
 	// LastResult is the outcome of the last finished action.
 	LastResult *Result `json:"lastResult,omitempty"`
+	// Heals are the most recent automatic repairs (newest first), HealCount all of them.
+	Heals     []HealEvent `json:"heals,omitempty"`
+	HealCount int         `json:"healCount,omitempty"`
+}
+
+// HealEvent is one automatic repair by the heal loop.
+type HealEvent struct {
+	Time      time.Time `json:"time"`
+	Service   string    `json:"service"`
+	Container string    `json:"container,omitempty"`
+	// Action: "restart" (docker restart of one container) or "up" (docker compose up -d).
+	Action string `json:"action"`
+	Reason string `json:"reason"`
+	OK     bool   `json:"ok"`
+	Error  string `json:"error,omitempty"`
+	// Attempt counts the repairs of this service since it was last healthy for a while.
+	Attempt int `json:"attempt"`
 }
 
 // Journal records an action in progress, enough to finish or undo it after a restart.

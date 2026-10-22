@@ -13,8 +13,8 @@ to the machine. It can do exactly this, and nothing else:
 | **Down** / **Up** | remove all containers (volumes stay) / start them again |
 
 Plus a read-only status view: desired state, per-container state/health/image, the current
-settings and the last known good ones, the steps and outcome of the last action, host CPUs,
-memory and NUMA nodes. No shell, no logs, no file access, no arbitrary compose.
+settings and the last known good ones, the steps and outcome of the last action, the automatic
+repairs of the heal loop, host CPUs, memory and NUMA nodes. No shell, no logs, no file access, no arbitrary compose.
 
 Go, standard library only (single static binary), in an image with the docker CLI and its
 compose plugin. It drives the host's Docker daemon through the mounted socket.
@@ -71,6 +71,17 @@ the stack down never stops it, and it never touches its own container.
   back, finishes an interrupted down, and then makes the stack match the desired state (up and
   healthy, or down). After a reboot Docker has already restarted the containers and this changes
   nothing.
+- **Auto-heal.** Docker restarts a container whose process exits, but not one that keeps running
+  and fails its health check. While the stack should be up and no action runs (same lock), the
+  manager checks it every 30 s: a container that has been `unhealthy` without interruption for 5
+  minutes gets `docker restart` (only containers labelled with the stack's project, never the
+  manager; same container and volumes — databases included, nothing is removed). A health
+  check's start period never counts (Docker reports `starting` then). A missing, stopped or
+  wrong-image container makes it run `docker compose up -d` for the desired settings, as at
+  start-up. Repeated repairs of one service back off: 1 min, doubling up to 30 min, reset after
+  30 healthy minutes. Every repair is listed on the page (last 30, plus a count) and in
+  `/status.json`. Tunable with `AUTO_HEAL`, `HEAL_INTERVAL_SECONDS`, `HEAL_GRACE_SECONDS`,
+  `HEAL_BACKOFF_BASE_SECONDS`, `HEAL_BACKOFF_MAX_SECONDS`.
 - **Never** `down -v`, never prunes images, never deletes volumes, never updates itself.
 
 ## Bootstrap (once, with SSH)
@@ -145,6 +156,7 @@ docker run --rm ghcr.io/nk-coding/mdeo-manager:<tag> render -mdeo-tag 1.0.0 -sim
 | `settings.go` | the settings, their ranges and sizing warnings |
 | `generate.go`, `stack.yaml.tmpl` | the compose generator and its template |
 | `engine.go`, `state.go` | actions, health check, rollback, journal and recovery, atomic state |
+| `heal.go` | the heal loop: restart of unhealthy containers, `up` for missing ones, backoff |
 | `docker.go` | the docker CLI calls (`compose config/up/down/ps`, `pull`, `image inspect`) |
 | `web.go`, `page.html.tmpl`, `auth.go` | the page, the forms, basic auth |
 | `host.go` | CPUs, memory and NUMA nodes from `/sys` and `/proc` |

@@ -119,6 +119,9 @@ func serve() error {
 		return err
 	}
 	engine.HealthTimeout = time.Duration(timeout) * time.Second
+	if engine.Heal, err = healPolicyFromEnv(); err != nil {
+		return err
+	}
 	engine.Logf = logger.Printf
 	docker.Log = func(s string) { logger.Print(s) }
 	logger.Printf("mdeo-manager %s: project %q, state %s, images %s, %d CPUs, %d NUMA nodes", version, project, stateDir, cfg.ImagePrefix, host.CPUs, len(host.Nodes))
@@ -128,6 +131,8 @@ func serve() error {
 	if err := engine.Reconcile(ctx); err != nil {
 		return err
 	}
+	go engine.RunHealLoop(ctx)
+	logger.Printf("auto-heal: %+v", engine.Heal)
 	web := NewWeb(engine, version)
 	srv := &http.Server{
 		Addr:              listenAddr(),
@@ -256,4 +261,36 @@ func render(args []string) error {
 	}
 	_, err = os.Stdout.Write(b)
 	return err
+}
+
+// healPolicyFromEnv reads AUTO_HEAL (default on) and the HEAL_* durations in seconds.
+func healPolicyFromEnv() (HealPolicy, error) {
+	p := DefaultHealPolicy()
+	switch strings.ToLower(env("AUTO_HEAL", "true")) {
+	case "true", "1", "yes", "on":
+	case "false", "0", "no", "off":
+		p.Enabled = false
+	default:
+		return p, errors.New("AUTO_HEAL must be true or false")
+	}
+	for _, f := range []struct {
+		name     string
+		d        *time.Duration
+		min, max int
+	}{
+		{"HEAL_INTERVAL_SECONDS", &p.Interval, 5, 3600},
+		{"HEAL_GRACE_SECONDS", &p.Grace, 10, 86400},
+		{"HEAL_BACKOFF_BASE_SECONDS", &p.BackoffBase, 10, 86400},
+		{"HEAL_BACKOFF_MAX_SECONDS", &p.BackoffMax, 10, 7 * 86400},
+	} {
+		v, err := strconv.Atoi(env(f.name, strconv.Itoa(int(f.d.Seconds()))))
+		if err != nil || v < f.min || v > f.max {
+			return p, fmt.Errorf("%s must be between %d and %d seconds", f.name, f.min, f.max)
+		}
+		*f.d = time.Duration(v) * time.Second
+	}
+	if p.BackoffMax < p.BackoffBase {
+		return p, errors.New("HEAL_BACKOFF_MAX_SECONDS must not be below HEAL_BACKOFF_BASE_SECONDS")
+	}
+	return p, nil
 }
