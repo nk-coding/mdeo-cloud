@@ -485,8 +485,29 @@ memory per traverser matters more than match time. It is read once, at startup.
 
 Transformations have a diagram editor too. Pattern objects and links appear as nodes and edges, with
 their modifier reflected in the styling, so the effect of a rule can be read at a glance. Element
-inputs, call outputs and loop variables appear as bound objects in the patterns that use them. The
-header — imports and `in` / `out` declarations — is not drawn; edit it in the textual editor.
+inputs, call outputs and loop variables appear as bound objects in the patterns that use them.
+
+The header is a box above the start node: the file's name, then one row per
+[import](#callable-transformations) and one per `in` / `out` declaration, written as in the source
+(`import "./sync/stores-of.mt" as storesOf`, `in maxCandidates: int = 0`). A file without
+declarations says *no inputs or outputs*. Double-click a row (or select it and press F2) to edit the
+line: a new name or alias is renamed wherever the file uses it — for an optional element input
+also the object of the first pattern it pins — and the type, default and path are replaced as
+typed; the editor refuses a line that does not parse or whose name is taken. Select a row and press
+Delete (or empty it) to remove the line. Deleting a declaration also deletes the pattern nodes that
+use it as an object (`placement { }`, `delete placement`) with their links, like deleting an
+instance; its other uses — in expressions, call arguments, scope blocks — stay and are reported by
+the validation, as are the calls of a deleted import. Errors and warnings of a line are shown on the
+box.
+
+The toolbox's **Declarations** group adds header lines. **Input**, **Output**, **Model Input** and
+**Model List Input** add a row with a fresh name — `in input1: int`, `out output1: int`,
+`in donor1: model`, `in donors1: List<model>` — and open it for editing with the name selected;
+Enter or clicking elsewhere keeps it, Escape discards it. The line goes where the textual editor's
+formatting puts it: inputs after the other inputs, outputs last, all after the imports.
+**Import…** opens a dialog to pick a `.mt` file of the project and, optionally, the alias, which
+defaults to the file name in camel case (`move-component.mt` becomes `moveComponent`), numbered when
+taken; the import goes after the other imports.
 
 The elements of a [scope block](#model-inputs) stay in the node of their pattern and are tagged with
 the model they belong to, `«in donor»`, the way the members of a `forbid` or `require` block are
@@ -495,8 +516,18 @@ tagged — combined with the block's tag where both apply, e.g. `«forbid 1, in 
 connected to it, into a scope block of the pattern, into a new one for any model input or loop
 variable over a `List<model>` in scope, or back to the **Transformed Model**. It only offers moves
 whose result validates. Elements of an input model offer no *Create* or *Delete*, a link drawn
-between two of them carries no modifier, and no link joins two models. Moving the last element out
-of a scope block, or deleting it, removes the block.
+between two of them carries no modifier, and no link joins two models: the editor does not let you
+draw or reconnect one. Moving the last element out of a scope block, or deleting it, removes the
+block.
+
+When the transformation has model inputs, the toolbox shows **Create in** below the creation modes:
+the *transformed model* (the default) or one of the model values — each `model` input, and the
+variable of each `for … in` loop over a `List<model>` input. With a model selected, a new pattern
+object goes into the target match's scope block of that model, or into a new `in donor { }` block
+when the match has none; in *Forbid* or *Require* mode into a new `forbid { in donor { … } }` (or
+`require`) block. *Create* and *Delete* are disabled, since input models are read-only, and **Add
+Instance** lists the objects of that model, to reference them in its scope block. A loop variable
+is only accepted in a match inside its loop; dropping into any other match creates nothing.
 
 A call is a node on the control flow, drawn with a double left edge, that shows the call's text.
 Double-click the text to edit the call's arguments and outputs. **Insert Statement** on a control
