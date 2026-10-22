@@ -1,7 +1,7 @@
 using "./microservices.mm"
-import { moveComponent } from "./generic/move-component.mt"
-import { storesOf } from "./sync/stores-of.mt"
-import { followHost } from "./sync/follow-host.mt"
+import "./generic/move-component.mt" as moveComponent
+import "./sync/stores-of.mt" as storesOf
+import "./sync/follow-host.mt" as followHost
 
 // The operator a layer-3 configuration lists. It counts as one operator: the generic move and
 // the repair always run together. If moveComponent fails, the whole operator fails.
