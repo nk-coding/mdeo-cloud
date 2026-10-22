@@ -112,7 +112,7 @@ class CallStatementExecutionTest {
             ast.callees.keys
         )
         val calls = ast.statements.filterIsInstance<TypedCallStatement>()
-        assertEquals(listOf("moveComponent", "followReader"), calls.map { it.name })
+        assertEquals(listOf("/optimize/generic/move-component.mt", "/optimize/sync/follow-reader.mt"), calls.map { it.callee })
         assertEquals("/metamodel/base.mm", ast.callees.getValue("/optimize/generic/move-component.mt").metamodelPath)
     }
 
@@ -150,10 +150,12 @@ class CallStatementExecutionTest {
     fun `a callee that does not match fails the call and the caller`(backend: String) {
         graph(backend).use { graph ->
             val result = run(graph, "/optimize/scenarios/call-failing.mt")
+            // the caller names the callee by the alias of its import
+            val alias = transformation("/optimize/scenarios/call-failing.mt").statements.filterIsInstance<TypedCallStatement>().single().name
 
             assertIs<TransformationExecutionResult.Failure>(result)
-            assertEquals("call noPlacement", result.failedAt)
-            assertTrue(result.reason.contains("noPlacement"), result.reason)
+            assertEquals("call $alias", result.failedAt)
+            assertTrue(result.reason.contains(alias), result.reason)
             assertFalse(result.isDeterministic, "the caller's first match ran before the call")
             val names = graph.toModelData().instances.mapNotNull { (it.properties["name"] as? ModelDataPropertyValue.StringValue)?.value }
             assertTrue("before" in names)
