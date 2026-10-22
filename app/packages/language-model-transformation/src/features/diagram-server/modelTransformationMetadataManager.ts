@@ -288,22 +288,21 @@ export class ModelTransformationMetadataManager extends MetadataManager<ModelTra
                 instanceNodeIdsInPattern.set(instanceName, instanceNodeId);
             }
 
+            // Every resolved reference gets a node, as in the GModel factory: besides objects of
+            // earlier matches, `x { }` may reference an element input, a call output or a loop variable.
             for (const [instanceName, ref] of referencedInstanceNodes) {
                 if (!localInstances.has(instanceName) && !deletedInstances.has(instanceName)) {
-                    const previousNodeId = this.declaredInstances.get(instanceName);
-                    if (previousNodeId != undefined) {
-                        const refNodeId = idRegistry.getId(ref);
-                        nodes[refNodeId] = {
-                            type: ModelTransformationElementType.NODE_PATTERN_INSTANCE,
-                            attrs: {
-                                name: instanceName,
-                                isReference: true
-                            }
-                        };
+                    const refNodeId = idRegistry.getId(ref);
+                    nodes[refNodeId] = {
+                        type: ModelTransformationElementType.NODE_PATTERN_INSTANCE,
+                        attrs: {
+                            name: instanceName,
+                            isReference: true
+                        }
+                    };
 
-                        this.addInstanceToMatchEdge(refNodeId, matchNodeId, edges);
-                        instanceNodeIdsInPattern.set(instanceName, refNodeId);
-                    }
+                    this.addInstanceToMatchEdge(refNodeId, matchNodeId, edges);
+                    instanceNodeIdsInPattern.set(instanceName, refNodeId);
                 }
             }
 
