@@ -13,8 +13,12 @@ import kotlinx.serialization.Serializable
  * as a match binds its objects. A callee failure fails the call, and `kill` in the callee ends
  * the whole transformation.
  *
+ * A model argument (for a `model` or `List<model>` input of the callee) is an identifier of a
+ * model value of the caller: it passes the caller's model by reference, so the callee matches in
+ * the very model the caller was given, which is never loaded twice.
+ *
  * @param callee Absolute path of the callee's file, its key in the root's callees.
- * @param name The callee's name, for messages.
+ * @param name The alias the caller imports the callee by (`import "./f.mt" as name`), for messages.
  * @param arguments The arguments passed.
  * @param outputs The outputs bound.
  */
@@ -75,7 +79,8 @@ data class TypedIfCallStatement(
  * Loop over a collection: `for name in collection do { ... }`.
  *
  * The collection is evaluated once; the do block runs once per element with [variable] bound one
- * scope level below the statement: a model element as a bound object, a scalar as a value.
+ * scope level below the statement: a model element as a bound object, a scalar as a value, and a
+ * model of a `List<model>` input as a model value.
  *
  * @param variable The loop variable.
  * @param collection The collection.

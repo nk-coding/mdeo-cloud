@@ -20,7 +20,9 @@ import kotlinx.serialization.Serializable
  *              type erasure. Types are indexed by typeIndex in expressions and statements.
  * @param metamodelPath Absolute path of the imported metamodel file that this transformation operates on.
  * @param statements All top-level transformation statements in the program.
- * @param signature The signature, when the transformation is callable.
+ * @param signature The header declarations (`in`/`out`) of the file, named after the file's base
+ *   name. Every file is callable; a file without declarations has an empty parameter list or no
+ *   signature, which the engine treats the same.
  * @param callees The typed ASTs of every transformation this one calls, directly or through its
  *   callees, by absolute file path. Only the root of a bundle has callees; the engine of a callee
  *   looks its own callees up in the root's map.
