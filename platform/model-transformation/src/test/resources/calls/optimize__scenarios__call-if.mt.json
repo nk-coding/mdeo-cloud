@@ -156,6 +156,10 @@
    ]
   }
  ],
+ "signature": {
+  "name": "call-if.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/generic/move-component.mt": {
    "types": [
@@ -435,7 +439,7 @@
     }
    ],
    "signature": {
-    "name": "moveComponent",
+    "name": "move-component.mt",
     "parameters": [
      {
       "name": "maxCandidates",
@@ -554,7 +558,7 @@
     }
    ],
    "signature": {
-    "name": "noPlacement",
+    "name": "no-placement.mt",
     "parameters": [
      {
       "name": "wanted",

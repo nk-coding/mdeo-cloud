@@ -62,6 +62,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "call-killing.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/killer.mt": {
    "types": [
@@ -125,7 +129,7 @@
     }
    ],
    "signature": {
-    "name": "killer",
+    "name": "killer.mt",
     "parameters": []
    }
   }

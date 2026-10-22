@@ -364,6 +364,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "call-looping.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/pick-candidate.mt": {
    "types": [
@@ -495,7 +499,7 @@
     }
    ],
    "signature": {
-    "name": "pickCandidate",
+    "name": "pick-candidate.mt",
     "parameters": [
      {
       "name": "placement",

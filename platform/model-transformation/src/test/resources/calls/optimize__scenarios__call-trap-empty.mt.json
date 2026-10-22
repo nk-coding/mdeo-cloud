@@ -351,6 +351,10 @@
    "elseIfBranches": []
   }
  ],
+ "signature": {
+  "name": "call-trap-empty.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/components-on.mt": {
    "types": [
@@ -488,7 +492,7 @@
     }
    ],
    "signature": {
-    "name": "componentsOn",
+    "name": "components-on.mt",
     "parameters": [
      {
       "name": "host",

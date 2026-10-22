@@ -131,6 +131,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "call-stopping.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/rename-unless-skipped.mt": {
    "types": [
@@ -279,7 +283,7 @@
     }
    ],
    "signature": {
-    "name": "renameUnlessSkipped",
+    "name": "rename-unless-skipped.mt",
     "parameters": [
      {
       "name": "target",

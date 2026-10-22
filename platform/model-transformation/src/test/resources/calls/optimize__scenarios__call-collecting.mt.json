@@ -424,6 +424,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "call-collecting.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/generic/move-component.mt": {
    "types": [
@@ -703,7 +707,7 @@
     }
    ],
    "signature": {
-    "name": "moveComponent",
+    "name": "move-component.mt",
     "parameters": [
      {
       "name": "maxCandidates",
@@ -879,7 +883,7 @@
     }
    ],
    "signature": {
-    "name": "componentsOn",
+    "name": "components-on.mt",
     "parameters": [
      {
       "name": "host",
@@ -970,7 +974,7 @@
     }
    ],
    "signature": {
-    "name": "markComponent",
+    "name": "mark-component.mt",
     "parameters": [
      {
       "name": "component",
@@ -1107,7 +1111,7 @@
     }
    ],
    "signature": {
-    "name": "renameAll",
+    "name": "rename-all.mt",
     "parameters": [
      {
       "name": "components",
@@ -1217,7 +1221,7 @@
     }
    ],
    "signature": {
-    "name": "candidatesOf",
+    "name": "candidates-of.mt",
     "parameters": [
      {
       "name": "options",

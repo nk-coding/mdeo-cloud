@@ -117,6 +117,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "call-making.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/make-container.mt": {
    "types": [
@@ -196,7 +200,7 @@
     }
    ],
    "signature": {
-    "name": "makeContainer",
+    "name": "make-container.mt",
     "parameters": [
      {
       "name": "label",

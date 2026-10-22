@@ -162,7 +162,7 @@
   }
  ],
  "signature": {
-  "name": "movePlacement",
+  "name": "move-placement.mt",
   "parameters": [
    {
     "name": "placement",

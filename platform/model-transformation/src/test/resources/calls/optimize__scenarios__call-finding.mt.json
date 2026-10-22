@@ -133,6 +133,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "call-finding.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/find-named.mt": {
    "types": [
@@ -319,7 +323,7 @@
     }
    ],
    "signature": {
-    "name": "findNamed",
+    "name": "find-named.mt",
     "parameters": [
      {
       "name": "wanted",

@@ -183,6 +183,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "move-with-stores.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/generic/move-component.mt": {
    "types": [
@@ -462,7 +466,7 @@
     }
    ],
    "signature": {
-    "name": "moveComponent",
+    "name": "move-component.mt",
     "parameters": [
      {
       "name": "maxCandidates",
@@ -663,7 +667,7 @@
     }
    ],
    "signature": {
-    "name": "followReader",
+    "name": "follow-reader.mt",
     "parameters": [
      {
       "name": "moved",

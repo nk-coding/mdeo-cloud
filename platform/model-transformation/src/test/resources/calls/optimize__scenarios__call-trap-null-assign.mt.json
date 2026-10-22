@@ -510,6 +510,10 @@
    "outputs": []
   }
  ],
+ "signature": {
+  "name": "call-trap-null-assign.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/fill-null.mt": {
    "types": [
@@ -640,7 +644,7 @@
     }
    ],
    "signature": {
-    "name": "fillNull",
+    "name": "fill-null.mt",
     "parameters": [
      {
       "name": "target",

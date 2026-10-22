@@ -96,6 +96,10 @@
    }
   }
  ],
+ "signature": {
+  "name": "call-failing.mt",
+  "parameters": []
+ },
  "callees": {
   "/optimize/scenarios/no-placement.mt": {
    "types": [
@@ -176,7 +180,7 @@
     }
    ],
    "signature": {
-    "name": "noPlacement",
+    "name": "no-placement.mt",
     "parameters": [
      {
       "name": "wanted",
