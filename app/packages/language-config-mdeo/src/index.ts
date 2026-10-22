@@ -10,3 +10,4 @@ export * from "./plugin/mdeoContributionPlugin.js";
 export * from "./validation/mdeoValidator.js";
 export * from "./mdeoPlugin.js";
 export * from "./features/mdeoCompletionProvider.js";
+export * from "./features/mdeoHoverProvider.js";
