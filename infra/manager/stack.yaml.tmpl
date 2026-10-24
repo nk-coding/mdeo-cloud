@@ -204,7 +204,7 @@ services:
       DATABASE_URL: jdbc:postgresql://postgres-script:5432/mdeo
       DATABASE_USER: ${SCRIPT_DB_USER:-mdeo}
       DATABASE_PASSWORD: ${SCRIPT_DB_PASSWORD:-${DATABASE_PASSWORD:?set DATABASE_PASSWORD in stack.env}}
-      BACKEND_API_URL: http://backend:8080
+      BACKEND_API_URL: http://backend:8080/api
       EXECUTION_TIMEOUT_MS: ${EXECUTION_TIMEOUT_MS:-300000}
     depends_on:
       postgres-script:
@@ -229,7 +229,7 @@ services:
       DATABASE_URL: jdbc:postgresql://postgres-model-transformation:5432/mdeo
       DATABASE_USER: ${MODEL_TRANSFORMATION_DB_USER:-mdeo}
       DATABASE_PASSWORD: ${MODEL_TRANSFORMATION_DB_PASSWORD:-${DATABASE_PASSWORD:?set DATABASE_PASSWORD in stack.env}}
-      BACKEND_API_URL: http://backend:8080
+      BACKEND_API_URL: http://backend:8080/api
       EXECUTION_TIMEOUT_MS: ${EXECUTION_TIMEOUT_MS:-300000}
     depends_on:
       postgres-model-transformation:
@@ -258,7 +258,7 @@ services:
       DATABASE_URL: jdbc:postgresql://postgres-optimizer:5432/mdeo
       DATABASE_USER: ${OPTIMIZER_DB_USER:-mdeo}
       DATABASE_PASSWORD: ${OPTIMIZER_DB_PASSWORD:-${DATABASE_PASSWORD:?set DATABASE_PASSWORD in stack.env}}
-      BACKEND_API_URL: http://backend:8080
+      BACKEND_API_URL: http://backend:8080/api
       SCRIPT_TIMEOUT_MS: ${SCRIPT_TIMEOUT_MS:-1000}
       TRANSFORMATION_TIMEOUT_MS: ${TRANSFORMATION_TIMEOUT_MS:-1000}
       NODE_ID: {{ q .ID }}
