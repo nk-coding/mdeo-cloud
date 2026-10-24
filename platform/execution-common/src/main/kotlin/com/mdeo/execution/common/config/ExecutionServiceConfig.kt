@@ -1,6 +1,23 @@
 package com.mdeo.execution.common.config
 
 import com.mdeo.common.transport.SessionClient
+import java.net.URI
+
+/**
+ * Completes a backend base URL that names only an origin with the API path.
+ *
+ * Everything an execution service asks the backend for sits below `/api`: the keys at
+ * `<base>/.well-known/jwks.json` as much as the data under `<base>/executions/...`. A bare
+ * `http://backend:8080` therefore turns every request into a 404 and, with the keys out of reach,
+ * every token into a rejected one. Such a URL is completed here rather than failing one request at
+ * a time; one that already carries a path is left exactly as it is, and so is anything that does
+ * not parse as a hierarchical URL.
+ */
+internal fun normalizeBackendApiUrl(url: String): String {
+    val base = url.trimEnd('/')
+    val path = runCatching { URI(base) }.getOrNull()?.takeUnless { it.isOpaque }?.path ?: return base
+    return if (path.isEmpty()) "$base/api" else base
+}
 
 /**
  * Base configuration interface for execution services.
@@ -67,7 +84,7 @@ data class BaseExecutionConfig(
             return BaseExecutionConfig(
                 serverPort = System.getenv("SERVER_PORT")?.toIntOrNull() ?: defaultPort,
                 database = DatabaseConfig.fromEnvironment(),
-                backendApiUrl = System.getenv("BACKEND_API_URL") ?: defaultBackendUrl,
+                backendApiUrl = normalizeBackendApiUrl(System.getenv("BACKEND_API_URL") ?: defaultBackendUrl),
                 jwtIssuer = System.getenv("JWT_ISSUER") ?: defaultJwtIssuer,
                 sessionConnectTimeoutMillis = System.getenv("SERVICE_CONNECT_TIMEOUT_SECONDS")
                     ?.toLongOrNull()?.takeIf { it > 0 }?.let { it * 1000 }
