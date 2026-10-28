@@ -3,7 +3,7 @@ import {
     BrowserMessageReader,
     BrowserMessageWriter,
     type RequestMessage
-} from "vscode-languageserver/browser.js";
+} from "vscode-languageserver/browser";
 import * as langium from "langium";
 import * as langiumLsp from "langium/lsp";
 import * as langiumGrammar from "langium/grammar";

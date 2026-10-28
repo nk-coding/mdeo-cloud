@@ -47,7 +47,12 @@ export class GEndNodeView extends GNodeView {
             return this.renderKillNode();
         }
         if (hasDeclarationRows(children)) {
-            return renderDeclarationText(this.renderStopNode(GEndNodeView.OUTER_RADIUS * 2), context, children, "below");
+            return renderDeclarationText(
+                this.renderStopNode(GEndNodeView.OUTER_RADIUS * 2),
+                context,
+                children,
+                "below"
+            );
         }
         return this.renderStopNode(GEndNodeView.OUTER_RADIUS * 2);
     }

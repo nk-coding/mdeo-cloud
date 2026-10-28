@@ -83,7 +83,8 @@ export function collectDiagnostics(document: LangiumDocument): DocumentDiagnosti
         return {
             source: (typeof dataCode === "string" ? DIAGNOSTIC_SOURCES[dataCode] : undefined) ?? "validation",
             severity: diagnostic.severity ?? ERROR_SEVERITY,
-            message: diagnostic.message,
+            // LSP 3.18 allows markup in a diagnostic message; reports carry its text.
+            message: typeof diagnostic.message === "string" ? diagnostic.message : diagnostic.message.value,
             range: diagnostic.range,
             ...(diagnostic.code != undefined && { code: diagnostic.code })
         };
