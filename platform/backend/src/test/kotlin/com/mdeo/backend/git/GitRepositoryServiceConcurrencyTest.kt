@@ -39,9 +39,9 @@ import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.PersonIdent
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 import java.time.Instant
 import java.util.UUID
@@ -52,13 +52,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.uuid.toKotlinUuid
-
-/**
- * Kotlin cannot instantiate Testcontainers' self-typed generic containers directly
- * (`PostgreSQLContainer<Nothing>` is as close as the type system gets and does not compile calls
- * that return `SELF`), so a trivially self-typed subclass is the standard way to use it from Kotlin.
- */
-internal class KPostgreSQLContainer(image: DockerImageName) : PostgreSQLContainer<KPostgreSQLContainer>(image)
 
 /**
  * Regression test for the race [GitRepositoryService.applyCommitToProject]'s per-file
@@ -76,7 +69,7 @@ internal class KPostgreSQLContainer(image: DockerImageName) : PostgreSQLContaine
 class GitRepositoryServiceConcurrencyTest {
 
     @Container
-    private val postgres = KPostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"))
+    private val postgres = PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"))
 
     private lateinit var fileService: FileService
     private lateinit var gitRepositoryService: GitRepositoryService

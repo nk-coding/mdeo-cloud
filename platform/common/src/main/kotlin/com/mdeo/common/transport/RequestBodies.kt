@@ -24,7 +24,7 @@ class RequestBodyTooLargeException(val limit: Long) : RuntimeException("Request 
  */
 suspend fun ApplicationCall.receiveBoundedText(limit: Long = MAX_DECODED_REQUEST_BYTES): String {
     request.contentLength()?.let { if (it > limit) throw RequestBodyTooLargeException(limit) }
-    val bytes = receiveChannel().readRemaining(limit + 1).readByteArray()
+    val bytes = receiveChannel().readBuffer(limit + 1).readByteArray()
     if (bytes.size > limit) throw RequestBodyTooLargeException(limit)
     return bytes.decodeToString()
 }
